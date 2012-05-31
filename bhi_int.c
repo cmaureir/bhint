@@ -1909,204 +1909,207 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         p->energy = en;
         #endif
 
-      if(p->nearestneighbour > 0 && p->nearestneighbour < *pcount && p != parts + p->nearestneighbour)
-	{
-	  pk = parts + p->nearestneighbour;
-	  if(pk->active &&
-	     (.5 * (p->m * scal_prod(p->v, p->v) + (pk->m * scal_prod(pk->v, pk->v))) - p->m * pk->m / v_dist(p->x, pk->x, 1.) < 0
-	     // m1*v1_^2/2 + m2*v2_^2/2 = .5 * m1*m2 / (m1 + m2) * |v1-v2|^2 !< m1*m2 / |r1-r2|
-	     // (.5 * v_dist(p->v, pk->v, 2) * v_dist(p->x, pk->x, 1) < p->m + pk->m
-	      //(0
-#ifdef USE_SSE
-#ifdef SSE_R_COLL
-	      || (p->sse_r > .0 && pk->sse_r > .0 && convert_length(v_dist(p->x, pk->x, 1), 0) * 206265. < (p->sse_r + pk->sse_r) * 4.7e-3)
-#endif
-#endif
-	      ))
-	    {
-	      add_collision(p, pk);
-	      fprintf(get_file(FILE_WARNING),
-#ifdef USE_SSE
-		      "#### [t=%1.12e] particles m%d and m%d formed a binary - merge (r1=%e\tr2=%e\tr=%e\tE_kin=%e\tE_pot=%e)!\n",
-#else
-		      "#### [t=%1.12e] particles m%d and m%d formed a binary - merge (r=%e\tE_kin=%e\tE_pot=%e)!\n",
-#endif
-		      t_total(tmin), p->name, pk->name,
-#ifdef USE_SSE
-		      p->sse_r, pk->sse_r,
-#endif
-		      convert_length(v_dist(p->x, pk->x, 1), 0) * 206265. / 4.7e-3,
-		      .5 * (p->m * scal_prod(p->v, p->v) + (pk->m * scal_prod(pk->v, pk->v))),
-		      //.5 * p->m * pk->m / (p->m + pk->m) * v_dist(p->v, pk->v, 2),
-		      -p->m * pk->m / v_dist(p->x, pk->x, 1));
-	      fflush(get_file(FILE_WARNING));
-	    }
-	}
-      p->nearestneighbour = -1;
+        if(p->nearestneighbour > 0 && p->nearestneighbour < *pcount && p != parts + p->nearestneighbour)
+        {
+            pk = parts + p->nearestneighbour;
+            if(pk->active &&
+                (.5 * (p->m * scal_prod(p->v, p->v) + (pk->m * scal_prod(pk->v, pk->v))) - p->m * pk->m / v_dist(p->x, pk->x, 1.) < 0
+                // m1*v1_^2/2 + m2*v2_^2/2 = .5 * m1*m2 / (m1 + m2) * |v1-v2|^2 !< m1*m2 / |r1-r2|
+                // (.5 * v_dist(p->v, pk->v, 2) * v_dist(p->x, pk->x, 1) < p->m + pk->m
+                //(0
+                #ifdef USE_SSE
+                #ifdef SSE_R_COLL
+                || (p->sse_r > .0 && pk->sse_r > .0 && convert_length(v_dist(p->x, pk->x, 1), 0) * 206265. < (p->sse_r + pk->sse_r) * 4.7e-3)
+                #endif
+                #endif
+            ))
+            {
+                add_collision(p, pk);
+                fprintf(get_file(FILE_WARNING),
+                        #ifdef USE_SSE
+                        "#### [t=%1.12e] particles m%d and m%d formed a binary - merge (r1=%e\tr2=%e\tr=%e\tE_kin=%e\tE_pot=%e)!\n",
+                        #else
+                        "#### [t=%1.12e] particles m%d and m%d formed a binary - merge (r=%e\tE_kin=%e\tE_pot=%e)!\n",
+                        #endif
+                        t_total(tmin), p->name, pk->name,
+                        #ifdef USE_SSE
+                        p->sse_r, pk->sse_r,
+                        #endif
+                        convert_length(v_dist(p->x, pk->x, 1), 0) * 206265. / 4.7e-3,
+                        .5 * (p->m * scal_prod(p->v, p->v) + (pk->m * scal_prod(pk->v, pk->v))),
+                        //.5 * p->m * pk->m / (p->m + pk->m) * v_dist(p->v, pk->v, 2),
+                        -p->m * pk->m / v_dist(p->x, pk->x, 1));
+                        fflush(get_file(FILE_WARNING));
+            }
+        }
+            p->nearestneighbour = -1;
+            int remove = 0;
 
-      int remove = 0;
-      if(x > convert_length(MAX_X, 1))
-	remove = 1;
-      if(remove)
-	{
-	  fprintf(get_file(FILE_WARNING), "### [%1.12e] m%d OUT OF RANGE - REMOVE: x=%e\tv=%e\te=%e\ta=%e\n",
-		  t_total(p->t),
-		  p->name,
-		  convert_length(x, 0),
-		  convert_length(convert_time(v_abs(p->v), 1), 0),
-		  p->curr_e,
-		  convert_length(p->curr_a, 0));
-	  fflush(get_file(FILE_WARNING));
-	}
-      //#endif
+            if(x > convert_length(MAX_X, 1))
+                remove = 1;
+                if(remove)
+                {
+                    fprintf(get_file(FILE_WARNING), "### [%1.12e] m%d OUT OF RANGE - REMOVE: x=%e\tv=%e\te=%e\ta=%e\n",
+                            t_total(p->t),
+                            p->name,
+                            convert_length(x, 0),
+                            convert_length(convert_time(v_abs(p->v), 1), 0),
+                            p->curr_e,
+                            convert_length(p->curr_a, 0));
+                    fflush(get_file(FILE_WARNING));
+                }
+                //#endif
 
-      for(i = 0; i < collisions; i++)
-	if(coll_vector[i][0] == parts + active[j])
-	  {
-	    pk = coll_vector[i][1];
-	    if(pk != parts)
-	      {
+                for(i = 0; i < collisions; i++)
+                    if(coll_vector[i][0] == parts + active[j])
+                    {
+                        pk = coll_vector[i][1];
+                        if(pk != parts)
+                        {
+                            #ifdef USE_GRAPE
+                            predict_part_hermite2(pk, tmin);
+                            #endif
 
-#ifdef USE_GRAPE
-		predict_part_hermite2(pk, tmin);
-#endif
+                            fprintf(get_file(FILE_WARNING),
+                                    "# MERGE: m1 = %e\tr1 = %e\tm2 = %e\tr2 = %e\tr = %e pc = %e Rsun\tv = %e pc/Myr\n",
+                                    convert_mass(p->m,  0), p->sse_r,
+                                    convert_mass(pk->m, 0), pk->sse_r,
+                                    convert_length(v_dist(p->x, pk->xp, 1), 0),
+                                    convert_length(v_dist(p->x, pk->xp, 1), 0) * 206265. / 4.7e-3,
+                                    convert_length(convert_time(v_dist(p->v, pk->vp, 1), 1), 0) * 1.e6
+                            );
 
-		fprintf(get_file(FILE_WARNING),
-			"# MERGE: m1 = %e\tr1 = %e\tm2 = %e\tr2 = %e\tr = %e pc = %e Rsun\tv = %e pc/Myr\n",
-			convert_mass(p->m,  0), p->sse_r,
-			convert_mass(pk->m, 0), pk->sse_r,
-			convert_length(v_dist(p->x, pk->xp, 1), 0),
-			convert_length(v_dist(p->x, pk->xp, 1), 0) * 206265. / 4.7e-3,
-			convert_length(convert_time(v_dist(p->v, pk->vp, 1), 1), 0) * 1.e6
-			);
-		/*
-		  double d_e = .5 * (p->m * scal_prod(p->v, p->v) + pk->m * scal_prod(pk->vp, pk->vp)) - p->m * pk->m / v_dist(p->x, pk->xp, 1);
-		  struct particle *d_p1;
+                            /*
+                              double d_e = .5 * (p->m * scal_prod(p->v, p->v) + pk->m * scal_prod(pk->vp, pk->vp)) - p->m * pk->m / v_dist(p->x, pk->xp, 1);
+                              struct particle *d_p1;
+                              for(d_p1 = parts; d_p1 < parts + (*pcount); d_p1++)
+                              if(d_p1 != p && d_p1 != pk)
+                              d_e -= d_p1->m * (p->m / v_dist(p->x, d_p1->xp, 1) + pk->m / v_dist(pk->xp, d_p1->xp, 1));
+                              fprintf(get_file(FILE_WARNING), "************** ENERGY: %1.12e\t", d_e);
+                            */
 
-		  for(d_p1 = parts; d_p1 < parts + (*pcount); d_p1++)
-		  if(d_p1 != p && d_p1 != pk)
-		  d_e -= d_p1->m * (p->m / v_dist(p->x, d_p1->xp, 1) + pk->m / v_dist(pk->xp, d_p1->xp, 1));
+                            p->energy = .5 * (p->m * scal_prod(p->v, p->v) + pk->m * (scal_prod(pk->vp, pk->vp)))
+                                            - p->m * pk->m / v_dist(p->x, pk->xp, 1);
 
-		  fprintf(get_file(FILE_WARNING), "************** ENERGY: %1.12e\t", d_e);
+                            pk->energy = .5 * p->m * pk->m / v_dist(p->x, pk->xp, 1);
+                            pk->x[0] = (pk->m * pk->xp[0] + p->m * p->x[0]) / (p->m + pk->m);
+                            pk->x[1] = (pk->m * pk->xp[1] + p->m * p->x[1]) / (p->m + pk->m);
+                            pk->x[2] = (pk->m * pk->xp[2] + p->m * p->x[2]) / (p->m + pk->m);
+                            pk->v[0] = (pk->m * pk->vp[0] + p->m * p->v[0]) / (p->m + pk->m);
+                            pk->v[1] = (pk->m * pk->vp[1] + p->m * p->v[1]) / (p->m + pk->m);
+                            pk->v[2] = (pk->m * pk->vp[2] + p->m * p->v[2]) / (p->m + pk->m);
 
-		*/
+                            if(p->dt < pk->dt)
+                            {
+                              pk->dt = p->dt;
+                            }
+                            pk->htlast = pk->t = tmin;
+                            pk->m += p->m;
 
-		p->energy = .5 * (p->m * scal_prod(p->v, p->v) + pk->m * (scal_prod(pk->vp, pk->vp)))
-		  - p->m * pk->m / v_dist(p->x, pk->xp, 1);
+                            // stellar collision
+                            pk->sse_mass += p->sse_mass / ((double) p->sse_multiple);
+                            pk->sse_mt += p->sse_mt / ((double) p->sse_multiple);
 
-		pk->energy = .5 * p->m * pk->m / v_dist(p->x, pk->xp, 1);
-		pk->x[0] = (pk->m * pk->xp[0] + p->m * p->x[0]) / (p->m + pk->m);
-		pk->x[1] = (pk->m * pk->xp[1] + p->m * p->x[1]) / (p->m + pk->m);
-		pk->x[2] = (pk->m * pk->xp[2] + p->m * p->x[2]) / (p->m + pk->m);
-		pk->v[0] = (pk->m * pk->vp[0] + p->m * p->v[0]) / (p->m + pk->m);
-		pk->v[1] = (pk->m * pk->vp[1] + p->m * p->v[1]) / (p->m + pk->m);
-		pk->v[2] = (pk->m * pk->vp[2] + p->m * p->v[2]) / (p->m + pk->m);
+                            pk->energy += pk->m * (.5 * (scal_prod(pk->v, pk->v) + pk->phi_stars) + p->phi_bgr - parts[0].m / v_abs(pk->x));
+                            // only valid if pk->phi is up to date (i.e. pk is active and USE_GRAPE ?)
 
-		if(p->dt < pk->dt)
-		  pk->dt = p->dt;
-		pk->htlast = pk->t = tmin;
+                            p->energy -= .5 * pk->m * scal_prod(pk->v, pk->v);
+                        }
+                        else // COLLISION with SMBH
+                        {
+                            p->energy = p->m * (.5 * scal_prod(p->v, p->v) - pk->m / v_abs(p->x) + p->phi_bgr);
+                            pk->m += p->m;
+                        }
 
-		pk->m += p->m;
+                        remove = 1;
+                        fprintf(get_file(FILE_WARNING),
+                                "#### [t=%1.12e] particle m%d swallowed m%d. New mass: %e\n",
+                                t_total(tmin), pk->name, p->name, convert_mass(pk->m, 0));
+                        fflush(get_file(FILE_WARNING));
+                        re_evaluate = 1;
+                        break; // only one collision per particle allowed
+                    }
 
+                    if(remove)
+                    {
+                        remove_part[removecount++] = active[j];
+                        active[j] = -1;
+                    }
+                }
 
-	        // stellar collision
-		pk->sse_mass += p->sse_mass / ((double) p->sse_multiple);
-		pk->sse_mt += p->sse_mt / ((double) p->sse_multiple);
+                if(removecount)
+                {
+                    for(j = 0; j < removecount; j++)
+                    {
+                        lose_energy(parts[remove_part[j]].energy);
+                        fprintf(get_file(FILE_WARNING),
+                                "#### [t=%1.12e] removing particle m%d at %d of %d loses energy %e\n",
+                                t_total(tmin), parts[remove_part[j]].name, remove_part[j], *pcount, parts[remove_part[j]].energy);
+                        if(remove_part[j] < --(*pcount))
+                        {
+                            memcpy(parts + remove_part[j], parts + *pcount, sizeof(struct particle));
+                            fprintf(get_file(FILE_WARNING),
+                                    "#### [t=%1.12e] particle at %d replaced by m%d\n",
+                                    t_total(tmin), remove_part[j], parts[remove_part[j]].name);
+                        }
 
+                        node_posmax--;
+                        fflush(get_file(FILE_WARNING));
+                        for(k = 0; k < close_n; k++)
+                        {
+                            if(close_list[k].p == parts + remove_part[j] || close_list[k].pk == parts + remove_part[j])
+                            {
+                                close_list[k].p = close_list[k].pk = NULL;
+                            }
+                        }
+                    }
 
-		pk->energy += pk->m * (.5 * (scal_prod(pk->v, pk->v) + pk->phi_stars) + p->phi_bgr - parts[0].m / v_abs(pk->x));
-		// only valid if pk->phi is up to date (i.e. pk is active and USE_GRAPE ?)
+                    if(re_evaluate)
+                    {
+                        fprintf(get_file(FILE_WARNING),
+                                "#### [t=%1.12e] Need to re-evaluate %d moved particles.\n",
+                                t_total(tmin), movecount);
+                        for(j = 0; j < movecount; j++)
+                        {
+                            if(active[j] > 0 && active[j] < *pcount)
+                            {
+                                evaluate_1_2(parts, *pcount, active[j], 0, 0, parts[active[j]].ha, parts[active[j]].ha_);
+                                evaluate_1_2(parts, *pcount, active[j], 1, *pcount - 1, parts[active[j]].a, parts[active[j]].a_);
+                            }
+                            check_app(parts, *pcount, .0);
+                        }
+                    }
 
-		p->energy -= .5 * pk->m * scal_prod(pk->v, pk->v);
+                    else
+                    {
+                        fprintf(get_file(FILE_WARNING),
+                                "#### [t=%1.12e] No need to re-evaluate %d moved particles.\n",
+                                t_total(tmin), movecount);
+                                fflush(get_file(FILE_WARNING));
+                    }
 
-	      }
-	    else // COLLISION with SMBH
-	      {
-		p->energy = p->m * (.5 * scal_prod(p->v, p->v) - pk->m / v_abs(p->x) + p->phi_bgr);
-		pk->m += p->m;
-	      }
-	    remove = 1;
-	    fprintf(get_file(FILE_WARNING),
-		    "#### [t=%1.12e] particle m%d swallowed m%d. New mass: %e\n",
-		    t_total(tmin), pk->name, p->name, convert_mass(pk->m, 0));
-	    fflush(get_file(FILE_WARNING));
-	    re_evaluate = 1;
-	    break; // only one collision per particle allowed
-	  }
+                    #ifdef USE_GRAPE
+                    fprintf(get_file(FILE_WARNING),
+                            "#### [t=%1.12e] Re-initialize GRAPE.\n",
+                            t_total(tmin));
+                            g6_close(C_GRAPE_CLUSID);
+                            grape_init(parts, *pcount);
+                    #endif
 
-      if(remove)
-	{
-	  remove_part[removecount++] = active[j];
-	  active[j] = -1;
-	}
-    }
+                    init_dt(parts, *pcount, 1);
+                    fprintf(get_file(FILE_WARNING), "### NEW NUMBER OF PARTICLES: %d\n", *pcount);
+                    fflush(get_file(FILE_WARNING));
+                }
 
+                T_END;
 
-  if(removecount)
-    {
-      for(j = 0; j < removecount; j++)
-	{
-	  lose_energy(parts[remove_part[j]].energy);
-	  fprintf(get_file(FILE_WARNING),
-		  "#### [t=%1.12e] removing particle m%d at %d of %d loses energy %e\n",
-		  t_total(tmin), parts[remove_part[j]].name, remove_part[j], *pcount, parts[remove_part[j]].energy);
-	  if(remove_part[j] < --(*pcount))
-	    {
-	      memcpy(parts + remove_part[j], parts + *pcount, sizeof(struct particle));
-	      fprintf(get_file(FILE_WARNING),
-		      "#### [t=%1.12e] particle at %d replaced by m%d\n",
-		      t_total(tmin), remove_part[j], parts[remove_part[j]].name);
-	    }
-	  node_posmax--;
-	  fflush(get_file(FILE_WARNING));
-	  for(k = 0; k < close_n; k++)
-	    if(close_list[k].p == parts + remove_part[j] || close_list[k].pk == parts + remove_part[j])
-	      close_list[k].p = close_list[k].pk = NULL;
-	}
+                move_center(parts, *pcount, tmin);
+                parts->v[0] = parts->v[1] = parts->v[2] = 0;
+                parts->x[0] = parts->x[1] = parts->x[2] = 0;
+                parts->vp[0] = parts->vp[1] = parts->vp[2] = 0;
+                parts->xp[0] = parts->xp[1] = parts->xp[2] = 0;
+                parts->t = tmin;
 
-      if(re_evaluate)
-	{
-	  fprintf(get_file(FILE_WARNING),
-		  "#### [t=%1.12e] Need to re-evaluate %d moved particles.\n",
-		  t_total(tmin), movecount);
-	  for(j = 0; j < movecount; j++)
-	    if(active[j] > 0 && active[j] < *pcount)
-	      {
-		evaluate_1_2(parts, *pcount, active[j], 0, 0, parts[active[j]].ha, parts[active[j]].ha_);
-		evaluate_1_2(parts, *pcount, active[j], 1, *pcount - 1, parts[active[j]].a, parts[active[j]].a_);
-	      }
-	  check_app(parts, *pcount, .0);
-	}
-      else
-	fprintf(get_file(FILE_WARNING),
-		"#### [t=%1.12e] No need to re-evaluate %d moved particles.\n",
-		t_total(tmin), movecount);
-      fflush(get_file(FILE_WARNING));
-
-
-#ifdef USE_GRAPE
-      fprintf(get_file(FILE_WARNING),
-	      "#### [t=%1.12e] Re-initialize GRAPE.\n",
-	      t_total(tmin));
-      g6_close(C_GRAPE_CLUSID);
-      grape_init(parts, *pcount);
-#endif
-      init_dt(parts, *pcount, 1);
-      fprintf(get_file(FILE_WARNING), "### NEW NUMBER OF PARTICLES: %d\n", *pcount);
-      fflush(get_file(FILE_WARNING));
-    }
-
-
-  T_END;
-
-
-  move_center(parts, *pcount, tmin);
-  parts->v[0] = parts->v[1] = parts->v[2] = 0;
-  parts->x[0] = parts->x[1] = parts->x[2] = 0;
-  parts->vp[0] = parts->vp[1] = parts->vp[2] = 0;
-  parts->xp[0] = parts->xp[1] = parts->xp[2] = 0;
-  parts->t = tmin;
-
-  _exit_function();
-  return movecount;
+        _exit_function();
+        return movecount;
 }
