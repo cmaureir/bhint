@@ -160,15 +160,9 @@ int check_fast_approaches(  struct particle *parts,
         t_close =  _u *  _v               + dy;
         t2      = -_u * (_v + M_PI * _1_3) + dy;
         t3      = -_u * (_v - M_PI * _1_3) + dy;
-        if(t2 > 0 && (t2 < t_close || t_close <= 0))
-        {
-            t_close = t2;
-            if(t3 > 0 && (t3 < t_close || t_close <= 0))
-            {
-                t_close = t3;
-            }
-        }
-
+        if(t2 > 0 && (t2 < t_close || t_close <= 0)) t_close = t2;
+        if(t3 > 0 && (t3 < t_close || t_close <= 0)) t_close = t3;
+    }
         while(1)
         {
             // check distance after next step
@@ -208,6 +202,7 @@ int check_fast_approaches(  struct particle *parts,
                                 fflush(get_file(FILE_DEBUG));
                         #endif
                     }
+                }
                 #endif
 
                 continue;

@@ -12,7 +12,7 @@
 
 
 
-enum _function {_UL_IO_OPEN_FILE=0, _UL_IO_INIT_FILES, _UL_IO_GET_PARAMS, _UL_IO_OUTPUT, 
+enum _function {_UL_IO_OPEN_FILE=0, _UL_IO_INIT_FILES, _UL_IO_GET_PARAMS, _UL_IO_OUTPUT,
 		_UL_IO_CALC, _UL_IO_CREATE, _UL_IO_OUTPUT_ENERGY, _UL_IO_CONVERT_TO_NBODY_UNITS,
 		_UL_IO_CALC_ENERGIES, _UL_IO_COMMENT_DATAFILE};
 
@@ -20,7 +20,7 @@ enum _function {_UL_IO_OPEN_FILE=0, _UL_IO_INIT_FILES, _UL_IO_GET_PARAMS, _UL_IO
 
 
 
-#define OUTPUT_INITDATA       0    // maximum particle name to print initial data for; -1 for all 
+#define OUTPUT_INITDATA       0    // maximum particle name to print initial data for; -1 for all
 
 #define MAX_FILES 20
 
@@ -84,7 +84,7 @@ char *get_next_filename(char *fname)
 {
   char *suffix=strrchr(fname, '.'), *filename=(char *)malloc(strlen(fname)+10);
   int no;
-  
+
   strcpy(filename, fname);
   if(suffix != NULL && (no = strtol(suffix + 1, NULL, 10)))
       sprintf(filename + (suffix - fname), ".%.4d", no + 1);
@@ -182,7 +182,7 @@ FILE* write_dump_io()
 	  filename,
 	  _conv_m, _conv_x, _conv_t, _conv_v, _conv_e,
 	  t_last, e_last,
-	  blocks_last, steps_last	  
+	  blocks_last, steps_last
 	  );
   return dumpfile;
 }
@@ -261,12 +261,12 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
 {
   _enter_function(_UL_IO, _UL_IO_GET_PARAMS);
   int i, j, k;
-  
+
   *m_max = .0;
   *pcount = 2;
   if(*time < 0)
     *time = convert_time(*time, 1);
-  
+
   double m_tot=.0, eta=.0, _1_r;
   char s[300];
 
@@ -280,20 +280,20 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
       if(s[0] != '#' && s[0] != '\n')
 	(*pcount)++;
     }
-  
+
   // initialize arrays
   *parts = (struct particle *)malloc(*pcount * sizeof(struct particle));
   //read data from file and return
-  
+
   rewind(infile);
   for(j = 0; !feof(infile); )
     {
       if(fgets(s, 299, infile) == NULL) continue;
       if(s[0] != '#' && s[0] != '\n')
 	{
-	  sscanf(s, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf", 
-		 &((*parts)[j].m), 
-		 (*parts)[j].x, (*parts)[j].x + 1, (*parts)[j].x + 2, 
+	  sscanf(s, "%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf",
+		 &((*parts)[j].m),
+		 (*parts)[j].x, (*parts)[j].x + 1, (*parts)[j].x + 2,
 		 (*parts)[j].v, (*parts)[j].v + 1, (*parts)[j].v + 2);
 	  //#ifdef USE_SSE
 	  if((*parts)[j].m < 0)
@@ -310,11 +310,11 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
 	  (*parts)[j].v[0] /= _conv_v;
 	  (*parts)[j].v[1] /= _conv_v;
 	  (*parts)[j].v[2] /= _conv_v;
-	  
+
 	  if(j > 0 && (*parts)[j].m > *m_max
 #ifdef P_IMBH
 	     && j != P_IMBH
-#endif		 
+#endif
 	     )
 	    *m_max = (*parts)[j].m;
 	  j++;
@@ -329,8 +329,8 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
 	      (*parts)[j].m * _conv_m,
 	      (*parts)[j].x[0] * _conv_x, (*parts)[j].x[1] * _conv_x, (*parts)[j].x[2] * _conv_x,
 	      (*parts)[j].v[0] * _conv_v, (*parts)[j].v[1] * _conv_v, (*parts)[j].v[2] * _conv_v);
-  
-    
+
+
   // reset other values
   for(j = 0; j < *pcount; j++)
     {
@@ -387,10 +387,10 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
 #endif
 
       if(j > 0)
-	get_reduced(*parts, j, 
-		    &((*parts)[j].orig_e), 
-		    &((*parts)[j].orig_a), 
-		    &((*parts)[j].orig_t), 
+	get_reduced(*parts, j,
+		    &((*parts)[j].orig_e),
+		    &((*parts)[j].orig_a),
+		    &((*parts)[j].orig_t),
 		    &((*parts)[j].orig_j));
    }
 
@@ -468,9 +468,9 @@ void print_header(int filetype, int pcount)
  *  orb_count   : number of completed orbits of 1st particle
  */
 
-int output(int print, struct particle parts[], int pcount, 
+int output(int print, struct particle parts[], int pcount,
 	    double t_old,
-	    double pt, 
+	    double pt,
 	    double t, double t_over, double orbits, double t_steps, double t_max, double steps, double blocks,
 	    int orb_count)
 {
@@ -483,13 +483,13 @@ int output(int print, struct particle parts[], int pcount,
   static int t_real_last = -1;
 
   // output if necessary
-  if((print == 1 
-      && (t_steps == 0 
+  if((print == 1
+      && (t_steps == 0
 	  || (t_steps > 0 && floor(t_tot*t_steps/t_max) > floor(t_old*t_steps/t_max))
 	  || (t_steps < 0 && (orb_count % (int)(-t_steps) == 0)))
       )
-     || (print == 2 
-	 && floor(t_tot*10.0/t_max) > floor((t_tot-parts[1].dt)*10.0/t_max) 
+     || (print == 2
+	 && floor(t_tot*10.0/t_max) > floor((t_tot-parts[1].dt)*10.0/t_max)
 	 && (t_tot==0 || t_tot>parts[1].dt))
      || print == -1)
     {
@@ -520,7 +520,7 @@ int output(int print, struct particle parts[], int pcount,
 	  p->curr_j = v_abs(kep_j);
 	  p->curr_e = v_abs(kep_e);
 	  p->curr_a = kep_a;
-	  
+
 	  if(p->t > p->io_tlast)
 	    {
 	      stepsc += p->curr_t * p->io_steps_c / (p->t - p->io_tlast);
@@ -541,8 +541,8 @@ int output(int print, struct particle parts[], int pcount,
 	      vr[0] = vr[1] = vr[2] = scal_prod(p->xp, p->vp) / scal_prod(p->xp, p->xp);
 	      vr[0] *= p->xp[0]; vr[1] *= p->xp[1]; vr[2] *= p->xp[2];
 	      vr_2 += scal_prod(vr, vr);
-	      v_2  += (p->vp[0] - vr[0]) * (p->vp[0] - vr[0]) 
-		+ (p->vp[1] - vr[1]) * (p->vp[1] - vr[1]) 
+	      v_2  += (p->vp[0] - vr[0]) * (p->vp[0] - vr[0])
+		+ (p->vp[1] - vr[1]) * (p->vp[1] - vr[1])
 		+ (p->vp[2] - vr[2]) * (p->vp[2] - vr[2]);
 	      if(p->curr_e > e_max)
 		e_max = p->curr_e;
@@ -628,7 +628,7 @@ int output(int print, struct particle parts[], int pcount,
 		    }
 		}
 #endif
-	      fprintf(get_file(FILE_DETAIL), 
+	      fprintf(get_file(FILE_DETAIL),
 #ifdef PRINT_DETAIL_AB
 		      "%1.12e\t %d \t%1.5e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%1.4e\t%1.4e\t%1.4e\t%1.6e\t%1.6e\t%1.6e\t%1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%1.6e\t%1.6e\t%d\n",
 #else
@@ -647,7 +647,7 @@ int output(int print, struct particle parts[], int pcount,
 		      p->r_apo*_conv_x,
 		      p->r_peri*_conv_x
 #ifdef PRINT_DETAIL_AB
-		      , a_[0]*_conv_x, a_[1]*_conv_x, a_[2]*_conv_x 
+		      , a_[0]*_conv_x, a_[1]*_conv_x, a_[2]*_conv_x
 		      , b_[0]*_conv_x, b_[1]*_conv_x, b_[2]*_conv_x
 #endif
 		      , p->energy
@@ -731,10 +731,10 @@ void calc(char **argv)
     printf("a=(%e, %e, %e), |a|=%e\n", a_[0] * _conv_x, a_[1] * _conv_x, a_[2] * _conv_x, v_abs(a_) * _conv_x);
     printf("b=(%e, %e, %e), |b|=%e\n", b_[0] * _conv_x, b_[1] * _conv_x, b_[2] * _conv_x, v_abs(b_) * _conv_x);
     printf("#	, %e*cos(t)+%e*sin(t)+%e, %e*cos(t)+%e*sin(t)+%e notitle with lines 2\\\n",
-    a_[0] * _conv_x, b_[0] * _conv_x, -a * e_[0] * _conv_x, 
+    a_[0] * _conv_x, b_[0] * _conv_x, -a * e_[0] * _conv_x,
     a_[1] * _conv_x, b_[1] * _conv_x, -a * e_[1] * _conv_x);
     printf("#	, %e*cos(t)+%e*sin(t)+%e, %e*cos(t)+%e*sin(t)+%e notitle with lines 2\\\n",
-    a_[0] * _conv_x, b_[0] * _conv_x, -a * e_[0] * _conv_x, 
+    a_[0] * _conv_x, b_[0] * _conv_x, -a * e_[0] * _conv_x,
     a_[2] * _conv_x, b_[2] * _conv_x, -a * e_[2] * _conv_x);
     printf("#	, .001*cos(t)+%e, .001*sin(t)+%e notitle with lines 2\\\n",
     r_[0] * _conv_x, r_[1] * _conv_x);
@@ -768,7 +768,7 @@ int smaller(const void *a, const void *b)
  *              e_max     maximum eccentricity
  *              m_min     minimum particle mass
  *              m_max     maximum particle mass
- *              imf_slope 
+ *              imf_slope
  *              sigma     deviation angle from disc (if given and not equal to "_", disc in xy-plane; spherically symmetric otherwise)
  *              delta     final rotation of system around x-axis (i.e. inclination to xy-plane)
  *              m1        starting interval of 2nd IMF section
@@ -779,7 +779,7 @@ int smaller(const void *a, const void *b)
 void create(int argc, char **arg)
 {
   _enter_function(_UL_IO, _UL_IO_CREATE);
-  
+
   if(argc < 9 || (argc > 12 && argc % 1))
     {
       fprintf(stderr, "too few arguments! Usage: nbody ! <N> <m_0> <alpha_3D> <a_min> <a_max> <e_min> <e_max> <m_min> <m_max> [imf_slope] [sigma] [delta] {m_i alpha_i}*\n");
@@ -808,7 +808,7 @@ void create(int argc, char **arg)
       imf_m[i]     =  atof(arg[2*i+10]);
       imf_alpha[i] = -atof(arg[2*i+11]);
     }
-  
+
   setup_imf(imf_m, imf_alpha, imf_n, imf_r, imf_f);
 
   for(i = 0; i < imf_n; i++)
@@ -836,7 +836,7 @@ void create(int argc, char **arg)
 
 
       mi = get_imf_mass(imf_m, imf_alpha, imf_n, imf_r, imf_f) / _conv_m;
-      
+
       //*
       if(drand(.0,1.) > (1. - BINARY_FRACTION))
 	//if(i < .5 * n)
@@ -845,7 +845,7 @@ void create(int argc, char **arg)
 	    mi = -2.*mi;
 	  }
       //*/
-      
+
       /*
 	# calculate mean mass
 	alpha:=1.35:
@@ -855,7 +855,7 @@ void create(int argc, char **arg)
       */
 
 
-      double r = a[i]; 
+      double r = a[i];
       //a[i] /= 1. + .5*e*e;
       r = a[i] * (1. + .5*e*e);
       x_ = (1 + e) * a[i];
@@ -864,17 +864,17 @@ void create(int argc, char **arg)
       if(argc > 10 && arg[10][0] != '_')     // for discs: gaussian distribution of inclination vector
 	{
 	  double sigma = atof(arg[10]);       // standard variation of angle of normal vector to z-axis in degree
-	  
+
 	  if(sigma >= .0)
 	    {
 	      do
 		{
 		  h = gauss() * sigma;
-		}	    
+		}
 	      while(fabs(h) > 90.);
 	      h = cos(h/180.*M_PI);
 	    }
-	  
+
 	  else // uniform distribution within angle
 	    {
 	      h = drand(cos(sigma/180*M_PI), 1.);
@@ -890,7 +890,7 @@ void create(int argc, char **arg)
       _n[0] = g * cos(phi);
       _n[1] = g * sin(phi);
       _n[2] = h;
-      
+
       if(fabs(h) >= 1.)
 	{
 	  e1[0] = e2[1] = 1.;
@@ -903,7 +903,7 @@ void create(int argc, char **arg)
 	  // g^2 = x^2 + y^2
 	  e1[0] = -_n[1] / g;         e1[1] = _n[0] / g;          e1[2] = .0;
 	  e2[0] = -_n[0] * _n[2] / g; e2[1] = -_n[1] * _n[2] / g; e2[2] = g;
-	}   
+	}
 
       // set ea = e1 * sin(phi) + e2 * cos(phi), eb = e1 * cos(phi) - e2 * sin(phi)
       phi = drand(-M_PI, M_PI);
@@ -925,7 +925,7 @@ void create(int argc, char **arg)
 	}
       v_ = v_abs(v);
       v_ = v_abs(_j) / v_abs(x) / sin(acos(scal_prod(x, v)/ (v_abs(x)*v_))) / v_;
-      
+
       for(k = 0; k < DIMENSIONS; k++)
 	v[k] *= v_;
       //printf("#\t%e\t%e\t%e\n", a, e, scal_prod(x, v));
@@ -964,7 +964,7 @@ void create(int argc, char **arg)
 void convert_to_nbody_units(struct particle parts[], int pcount)
 {
   _enter_function(_UL_IO, _UL_IO_CONVERT_TO_NBODY_UNITS);
-  
+
   int i;
   double c_m=.0, c_r=.0, c_v=.0, e_pot=.0, c_v_[3]={0,0,0};
   struct particle *p, *p2;
@@ -977,10 +977,10 @@ void convert_to_nbody_units(struct particle parts[], int pcount)
   for(p = parts; p < parts + pcount - 1; p++)
     for(p2 = p + 1; p2 < parts + pcount; p2++)
       e_pot -= p->m * p2->m / v_dist(p->x, p2->x, 1);
-  
+
   c_r = -.5 / e_pot;
   c_v = sqrt(c_m / c_r);
-  
+
   for(p = parts; p < parts + pcount; p++)
     for(i = 0; i < 3; i++)
       {
@@ -1007,7 +1007,7 @@ void convert_to_nbody_units(struct particle parts[], int pcount)
 	   p->m,
 	   p->x[0], p->x[1], p->x[2],
 	   p->v[0], p->v[1], p->v[2]);
-  
+
   _exit_function();
 }
 

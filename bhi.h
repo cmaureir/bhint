@@ -179,11 +179,11 @@ double inclination(double r0[3], double v0[3], double r1[3], double v1[3], doubl
  */
 
 int step_kepler(struct particle parts[], int pcount);
-void get_constants(double x[3], double v[3], double m_central);
+void get_constants(double x[3], double v[3], double m_central, double j[3], double e[3], double *a, double *omega);
 void get_reduced(struct particle parts[], int pos, double *red_e, double *red_a, double *red_t, double *red_j);
 void step_kepler_1(struct particle parts[], int pcount, int pos, double dt, double *out_a, double *out_a_, double *out_a_2, double *out_a_3, double *curr_a, double *curr_e); ;
 void move_center(struct particle parts[], int pcount, double t);
-void predict(struct particle parts[], int pcount, double t, double j[3], double e[3], double *a, double *omega);
+void predict(struct particle parts[], int pcount, double t);
 double solve_kepler(double mean, double ecc);
 double kepler(const double ecc, double mean_anom);
 double get_timestep_simple(double x0[3], double v0[3], double x[3], double v[3]);
@@ -198,11 +198,11 @@ double convert_mass(double mass, int forward);
 double convert_energy(double energy, int forward);
 double t_total(double t);
 double m_max(void);
-double pt, t, t_over;
-double orbits, t_steps, t_max, steps,  blocks;
 int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount, double *m_max);
 int output(int print, struct particle parts[], int pcount, double t_old,
-int orb_count);
+    double pt, double t, double t_over,
+    double orbits, double t_steps, double t_max, double steps, double blocks,
+    int orb_count);
 int local_io();
 void print_header(int filetype, int pcount);
 void calc(char **argv);

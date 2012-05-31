@@ -497,9 +497,8 @@ void integrate( struct particle parts[], int pcount,
         check_app(parts, pcount, .0);
 
         // print headlines
-        fprintf(get_file(FILE_OUTPUT),
-                 "#t       \tN\t \tdE/E0/dt\tdE/E0   \tE_lost  \tE_emit  \t \tdt_out
-                 \tavg-steps\tavg-timestep\tavg-blockstep\tyr/s   \t \te_max   \ta_min
+        fprintf(get_file(FILE_OUTPUT), "#t       \tN\t \tdE/E0/dt\tdE/E0   \tE_lost  \tE_emit  \t \tdt_out  \
+                 \tavg-steps\tavg-timestep\tavg-blockstep\tyr/s   \t \te_max   \ta_min                      \
                   \tincl(1,2)\tangle(1,2)\t \te_P     \ta_P     \tr_P     \tE_P     \tdt_P\n");
 
         print_header(FILE_DETAIL, pcount);
@@ -555,9 +554,15 @@ void integrate( struct particle parts[], int pcount,
             fclose(dumpfile);
             lastdump = time(NULL);
 
-            if(ul_kill > 0) break;
+            if(ul_kill > 0)
+            {
+             break;
+            }
+
+        if(parts[1].t + t_over >= t_max && !force_print)
+        {
+             break;
         }
-        if(parts[1].t + t_over >= t_max && !force_print) break;
 
         printed = 0;
 
