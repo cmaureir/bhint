@@ -360,13 +360,13 @@ void re_init(struct particle *parts, int pcount)
 }
 
 
-
 /*
  * Integrate problem of _pcount_ particles.
  * If _orbits_ > 0, integrate for _orbits_ orbits of 1st particle.
  * If _orbits_ < 0, integrate for -_orbits_ units of time.
  * Output _t_steps_ steps, or all if zero.
  */
+
 void integrate( struct particle parts[], int pcount,
                 int method, int print, double orbits, double t_steps,
                 FILE *dumpfile, int print_dump_only)
@@ -377,8 +377,8 @@ void integrate( struct particle parts[], int pcount,
     double rv_=0.0, rv=0.0, del_t = 0.0;
     double orig_a, orig_e, orig_j, orig_t, m_tot=0.0, t_old=-1.0;
     int i, j, orb_count=0, order, init=1, printed=1;
-    int force_print=0, init_phase=1, steps=0;
     struct particle *p;
+    int force_print=0, init_phase=1, steps=0;
     time_t lastdump=.0;
 
     for(i = 0; i < 2 * MAX_STEPSIZE_POWER; i++)
@@ -394,7 +394,7 @@ void integrate( struct particle parts[], int pcount,
         fscanf(dumpfile,"%*s    %le", &t_max);
         t_max = convert_time(t_max, 1);
         // INTEGRATE-VARS
-        fscanf( dumpfile,
+        fscanf(dumpfile,
                 "%*s    %le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%le\t%d\t%d\t%d\t%ld\t%le\t%ld\t%le\t%d",
                 &t_maxval, &t_eval, &pt, &e_, &a_, &t_, &j_, &rv_, &rv, &del_t,
                 &orig_a, &orig_e, &orig_j, &orig_t, &m_tot, &t_old, &t_over,
@@ -402,15 +402,16 @@ void integrate( struct particle parts[], int pcount,
                 &count_steps, &count_steps_over, &count_blocks, &count_blocks_over,
                 &force_print);
         // INTEGRATE-PARAMS
-        fscanf( dumpfile,
+        fscanf(dumpfile,
                 "%*s    %d\t%d\t%d\t%le\t%le",
                 &pcount, &method, &print, &orbits, &t_steps);
 
         parts = (struct particle *)malloc(pcount * sizeof(struct particle));
         // ENERGY
-        fscanf( dumpfile,
+        fscanf(dumpfile,
                 "%*s    %le",
-                &lost_energy);
+                &lost_energy
+                );
 
         //PARTICLES
         fscanf(dumpfile, "%*s%*c");
@@ -422,167 +423,142 @@ void integrate( struct particle parts[], int pcount,
                 #ifdef P_IMBH
                 && p->name != P_IMBH
                 #endif
-            )
-        {
-            _m_max = p->m;
-        }
-
+                )
+                _m_max = p->m;
 
         #ifdef USE_SSE
         for(p = parts; p < parts + pcount; p++)
-        {
             if(N_MAX_DETAIL >= -1 && p->name > N_MAX_DETAIL)
-            {
                 p->sse_on = 0;
-            }
-        }
         #endif
 
         if(print_dump_only)
         {
             for(p = parts; p < parts + pcount; p++)
-            {
                 printf("%1.12e\t %d \t%1.5e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%-1.6e\t%1.4e\t%1.4e\t%1.4e\t%1.6e\t%1.6e\t%1.6e\t%1.6e\t%1.9e\t%1.9e\t%d\n",
-                   t_total(p->t),
-                   p->name,
-                   convert_mass(p->m, 0),
-                   convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
-                   convert_length(convert_time(p->v[0], 1), 0), convert_length(convert_time(p->v[1], 1), 0), convert_length(convert_time(p->v[2], 1), 0),
-                   convert_length(v_abs(p->x), 0),
-                   convert_length(p->curr_a, 0),
-                   1 - p->curr_e,
-                   convert_length(p->rmin, 0),
-                   convert_length(p->rmax, 0),
-                   convert_length(p->r_apo, 0),
-                   convert_length(p->r_peri, 0),
-                   p->energy,
-                   p->energy + p->m * (.5 * p->phi_stars),
-                   p->sse_multiple
-                   );
-            }
+                        t_total(p->t),
+                        p->name,
+                        convert_mass(p->m, 0),
+                        convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
+                        convert_length(convert_time(p->v[0], 1), 0), convert_length(convert_time(p->v[1], 1), 0), convert_length(convert_time(p->v[2], 1), 0),
+                        convert_length(v_abs(p->x), 0),
+                        convert_length(p->curr_a, 0),
+                        1 - p->curr_e,
+                        convert_length(p->rmin, 0),
+                        convert_length(p->rmax, 0),
+                        convert_length(p->r_apo, 0),
+                        convert_length(p->r_peri, 0),
+                        p->energy,
+                        p->energy + p->m * (.5 * p->phi_stars),
+                        p->sse_multiple
+                        );
             return;
         }
 
         lastdump = time(NULL);
         fprintf(get_file(FILE_OUTPUT), "######## Loaded %d particles at t=%le.\n",
-             pcount, t_total(parts[1].t));
+                pcount, t_total(parts[1].t));
         fflush(get_file(FILE_OUTPUT));
         lastdump = time(NULL);
         goto ITERATE;
-        }
+    }
 
-        // calculate start parameters
-        softening_par2 = SOFTENING_PAR_2;
-        pt = -get_epot(parts, pcount, 0) - get_ekin(parts, pcount, 0);
+    // calculate start parameters
+    softening_par2 = SOFTENING_PAR_2;
+    pt = -get_epot(parts, pcount, 0) - get_ekin(parts, pcount, 0);
 
-        for(j = 0; j < pcount; j++)
+    for(j = 0; j < pcount; j++)
+        m_tot += parts[j].m;
+
+    get_reduced(parts, 1, &orig_e, &orig_a, &orig_t, &orig_j);//red_, red_+1, red_+2, red_+3);
+    t_max = (orbits >= 0) ? (double)orbits * orig_t : -orbits;
+
+    for(j = 1; j < pcount; j++)
+    {
+        evaluate_1_2(parts, pcount, j, 0, 0, parts[j].ha, parts[j].ha_);
+        evaluate_1_2(parts, pcount, j, 1, pcount - 1, parts[j].a, parts[j].a_);
+        parts[j].dt = normalize_dt(parts[j].t,
+                                    //get_timestep_simple(parts[0].x, parts[0].v, parts[j].x, parts[j].v)
+                                    get_timestep_central(parts, parts + j, MIN_EVALS)
+                                    * .01);
+    }
+    check_app(parts, pcount, .0);
+
+    // print headlines
+    fprintf(get_file(FILE_OUTPUT), "#t       \tN\t \tdE/E0/dt\tdE/E0   \tE_lost  \tE_emit  \t \tdt_out  \tavg-steps\tavg-timestep\tavg-blockstep\tyr/s   \t \te_max   \ta_min   \tincl(1,2)\tangle(1,2)\t \te_P     \ta_P     \tr_P     \tE_P     \tdt_P\n");
+    print_header(FILE_DETAIL, pcount);
+
+    if(t_steps >= 0)
+        output(print, parts, pcount, t_old,
+                pt, parts[1].t, t_over,
+                orbits, t_steps, t_max,
+                count_steps + count_steps_over, count_blocks + count_blocks_over,
+                orb_count);
+
+    ITERATE:
+    //force_print = 1;
+    // iterate
+    for(;; add_over(1, &count_blocks, &count_blocks_over))
+    {
+        // dump status
+        if(ul_kill > 0 || (printed &&
+            ((time(NULL) - lastdump > DUMP_INTERVAL)
+            || (parts[1].t + t_over >= t_max && !force_print))))
         {
-            m_tot += parts[j].m;
-        }
+            dumpfile = write_dump_io();
+            fprintf(dumpfile,
+                    "MAX-TIME %1.32le\n",
+                    convert_time(t_max, 0));
+                    fprintf(dumpfile,
+                    "INTEGRATE-VARS %1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%16d\t%16d\t%16d\t%32ld\t%1.32le\t%32ld\t%1.32le\t%16d\n",
+                    t_maxval, t_eval, pt, e_, a_, t_, j_, rv_, rv, del_t,
+                    orig_a, orig_e, orig_j, orig_t, m_tot, t_old, t_over,
+                    orb_count, order, init,
+                    count_steps, count_steps_over, count_blocks, count_blocks_over,
+                    force_print);
+            fprintf(dumpfile,
+                    "INTEGRATE-PARAMS %32d\t%32d\t%32d\t%1.32le\t%1.32le\n",
+                    pcount, method, print, orbits, t_steps
+                    );
 
-        get_reduced(parts, 1, &orig_e, &orig_a, &orig_t, &orig_j);//red_, red_+1, red_+2, red_+3);
-        t_max = (orbits >= 0) ? (double)orbits * orig_t : -orbits;
+            fprintf(dumpfile, "ENERGY %1.32le\n", lost_energy);
 
-        for(j = 1; j < pcount; j++)
-        {
 
-            evaluate_1_2(parts, pcount, j, 0, 0, parts[j].ha, parts[j].ha_);
-            evaluate_1_2(parts, pcount, j, 1, pcount - 1, parts[j].a, parts[j].a_);
-            parts[j].dt = normalize_dt(parts[j].t,
-                          //get_timestep_simple(parts[0].x, parts[0].v, parts[j].x, parts[j].v)
-                          get_timestep_central(parts, parts + j, MIN_EVALS)
-                          * .01);
-        }
-
-        check_app(parts, pcount, .0);
-
-        // print headlines
-        fprintf(get_file(FILE_OUTPUT), "#t       \tN\t \tdE/E0/dt\tdE/E0   \tE_lost  \tE_emit  \t \tdt_out  \
-                 \tavg-steps\tavg-timestep\tavg-blockstep\tyr/s   \t \te_max   \ta_min                      \
-                  \tincl(1,2)\tangle(1,2)\t \te_P     \ta_P     \tr_P     \tE_P     \tdt_P\n");
-
-        print_header(FILE_DETAIL, pcount);
-
-        if(t_steps >= 0)
-        {
-            output(print, parts, pcount, t_old,
-                    pt, parts[1].t, t_over,
-                    orbits, t_steps, t_max,
-                    count_steps + count_steps_over, count_blocks + count_blocks_over,
-                    orb_count);
-        }
-
-        ITERATE:
-        //force_print = 1;
-        // iterate
-        for(;; add_over(1, &count_blocks, &count_blocks_over))
-        {
-            // dump status
-            if(ul_kill > 0 || (printed &&
-                ((time(NULL) - lastdump > DUMP_INTERVAL)
-                || (parts[1].t + t_over >= t_max && !force_print))))
+            fprintf(dumpfile,
+                    "PARTICLES ");
+            i = fwrite(parts, sizeof(struct particle), pcount, dumpfile);
+            if(i != pcount)
             {
-
-                dumpfile = write_dump_io();
-                fprintf(dumpfile,
-                        "MAX-TIME %1.32le\n",
-                        convert_time(t_max, 0));
-                fprintf(dumpfile,
-                        "INTEGRATE-VARS %1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%16d\t%16d\t%16d\t%32ld\t%1.32le\t%32ld\t%1.32le\t%16d\n",
-                        t_maxval, t_eval, pt, e_, a_, t_, j_, rv_, rv, del_t,
-                        orig_a, orig_e, orig_j, orig_t, m_tot, t_old, t_over,
-                        orb_count, order, init,
-                        count_steps, count_steps_over, count_blocks, count_blocks_over,
-                        force_print);
-                fprintf(dumpfile,
-                        "INTEGRATE-PARAMS %32d\t%32d\t%32d\t%1.32le\t%1.32le\n",
-                        pcount, method, print, orbits, t_steps);
-
-                fprintf(dumpfile, "ENERGY %1.32le\n", lost_energy);
-                fprintf(dumpfile, "PARTICLES ");
-
-                i = fwrite(parts, sizeof(struct particle), pcount, dumpfile);
-                if(i != pcount)
-                {
-                    fprintf(get_file(FILE_WARNING),
-                            "### PROBLEM WRITING DUMP FILE: WROTE %d OF %d PARTICLES\n",
-                            i, pcount);
-                }
+                fprintf(get_file(FILE_WARNING),
+                        "### PROBLEM WRITING DUMP FILE: WROTE %d OF %d PARTICLES\n",
+                        i, pcount);
                 fflush(get_file(FILE_WARNING));
             }
 
             fclose(dumpfile);
             lastdump = time(NULL);
 
-            if(ul_kill > 0)
-            {
-             break;
-            }
-
-        if(parts[1].t + t_over >= t_max && !force_print)
-        {
-             break;
+            if(ul_kill > 0) break;
         }
+        if(parts[1].t + t_over >= t_max && !force_print) break;
 
         printed = 0;
-
         // integration step
         t_old = parts[1].t + t_over;
-
         switch(method)
         {
             case 'i':
                 steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
-            break;
+                break;
         }
-
         add_over(steps, &count_steps, &count_steps_over);
-
         #ifdef INIT_TIME
-        /*  if(steps >= pcount-1) */
-        /*  printf("%d\t%ld\t%e\t%e\n", init_phase, steps, parts[1].t + t_over, INIT_TIME); */
-
-        if(init_phase && (steps == pcount-1) && (parts[1].t + t_over >= INIT_TIME))
+        /*       if(steps >= pcount-1) */
+        /* 	printf("%d\t%ld\t%e\t%e\n", init_phase, steps, parts[1].t + t_over, INIT_TIME); */
+        if(init_phase
+            && (steps == pcount-1)
+            && (parts[1].t + t_over >= INIT_TIME)
+            )
         {
             re_init(parts, pcount);
             init_phase = 0;
@@ -591,55 +567,45 @@ void integrate( struct particle parts[], int pcount,
 
         if(t_steps < 0)
         {
-
-        // count apocenter passage
-        predict(parts, pcount, parts[1].t);
-        rv_ = (parts[1].xp[0]-parts[0].xp[0])*(parts[1].vp[0]-parts[0].vp[0])
-                + (parts[1].xp[1]-parts[0].xp[1])*(parts[1].vp[1]-parts[0].vp[1])
-                + (parts[1].xp[2]-parts[0].xp[2])*(parts[1].vp[2]-parts[0].vp[2]);
-
-                if(rv_ != 0 && rv != 0)
+            // count apocenter passage
+            predict(parts, pcount, parts[1].t);
+            rv_ = (parts[1].xp[0]-parts[0].xp[0])*(parts[1].vp[0]-parts[0].vp[0])
+                    + (parts[1].xp[1]-parts[0].xp[1])*(parts[1].vp[1]-parts[0].vp[1])
+                    + (parts[1].xp[2]-parts[0].xp[2])*(parts[1].vp[2]-parts[0].vp[2]);
+            if(rv_ != 0 && rv != 0)
+            {
+                if(rv_ < 0 && rv > 0) // 1st particle at apocenter
+                //if(rv_ > 0 && rv < 0) // 1st particle at pericenter
                 {
-                    if(rv_ < 0 && rv > 0) // 1st particle at apocenter
-                         //if(rv_ > 0 && rv < 0) // 1st particle at pericenter
+                    if(t_steps < 0)
                     {
-                        if(t_steps < 0)
-                        {
-                            force_print = output(force_print ? -1 : print, parts, pcount,
-                                                    t_old,
-                                                    //orig_e, orig_a, orig_j,
-                                                    pt,
-                                                    parts[1].t, t_over, orbits, t_steps, t_max,
-                                                    count_steps + count_steps_over, count_blocks + count_blocks_over,
-                                                    orb_count);
-                            if(!force_print)
-                            {
-                                printed = 1;
-                            }
-                        }
-                        orb_count++;
-                        del_t = (parts[1].t+t_over) / orb_count / orig_t;
+                        force_print = output(force_print ? -1 : print, parts, pcount,
+                                                t_old,
+                                                //orig_e, orig_a, orig_j,
+                                                pt,
+                                                parts[1].t, t_over, orbits, t_steps, t_max,
+                                                count_steps + count_steps_over, count_blocks + count_blocks_over,
+                                                orb_count);
+                        if(!force_print)
+                            printed = 1;
                     }
+                    orb_count++;
+                    del_t = (parts[1].t+t_over) / orb_count / orig_t;
                 }
+            }
 
-                if(rv_ != 0)
-                {
-                    rv = rv_;
-                }
+        if(rv_ != 0)
+            rv = rv_;
         }
-
         if(parts[1].t > t_maxval)
         {
             i = 1;
             for(p = parts; p < parts + pcount; p++)
-            {
-
                 if(p->t < t_maxval)
                 {
                     i = 0;
                     break;
                 }
-
                 if(i)
                 {
                     for(p = parts; p < parts + pcount; p++)
@@ -649,24 +615,18 @@ void integrate( struct particle parts[], int pcount,
                         p->htlast -= t_maxval;
                         #ifdef USE_GRAPE
                         if((method == 'i') && (p > parts))
-                        {
                             grape_send_particle(p, p - parts);
-                        }
                         #endif
                     }
-
                     t_over += t_maxval;
                     fprintf(get_file(FILE_WARNING),
                             "### [%1.12e] reset time by %e (%e system units) ###\n",
                             t_total(.0), convert_time(t_maxval, 0), t_maxval);
                 }
-            }
        }
 
         if(t_old < t_max && parts[1].t + t_over >= t_max)
-        {
             force_print = 1;
-        }
 
         if(t_steps >= 0 )// && parts[1].t > 0)
         {
@@ -677,9 +637,7 @@ void integrate( struct particle parts[], int pcount,
                                     count_steps + count_steps_over, count_blocks + count_blocks_over,
                                     orb_count);
             if(!force_print)
-            {
                 printed = 1;
-            }
         }
     }
 
@@ -689,46 +647,43 @@ void integrate( struct particle parts[], int pcount,
 
     double epot = get_epot(parts, pcount, 0);
     double ekin = get_ekin(parts, pcount, 0);
-
     fprintf(get_file(FILE_OUTPUT), "# 1-e\t\t a\t\t T\t\t de/e\t\t da/a\t\t dT");
     fprintf(get_file(FILE_OUTPUT), "\t\tdj\t\t dE\t\t T_obs/T_H\t n\t orb\tangle\n");
     fprintf(get_file(FILE_OUTPUT), "# %e\t %e\t %e\t %e\t %e\t %e\t %e\t %e\t %e\t %e\t %d %3.2f\n",
-        1-orig_e,
-        convert_length(orig_a, 0),
-        convert_time(orig_t, 0),
-        e_/orig_e-1.0,
-        a_/orig_a-1.0,
-        t_/orig_t-1.0,
-        j_/orig_j-1.0,
-        pt/(epot + ekin)
-        -1.,
-        del_t,
-        orbits,
-        orb_count,
-        pcount > 2 ? vec_angle(parts[1].xp, parts[0].xp, parts[2].xp) : 0);
+            1-orig_e,
+            convert_length(orig_a, 0),
+            convert_time(orig_t, 0),
+            e_/orig_e-1.0,
+            a_/orig_a-1.0,
+            t_/orig_t-1.0,
+            j_/orig_j-1.0,
+            pt/(epot + ekin)
+            -1.,
+            del_t,
+            orbits,
+            orb_count,
+            pcount > 2 ? vec_angle(parts[1].xp, parts[0].xp, parts[2].xp) : 0);
     fprintf(get_file(FILE_OUTPUT), "# t1=%e\tE0=%e\t dE=%e\t dE/E0=%1.12e\tlost=%e\n",
-        t_total(parts[1].t),
-        -pt,
-        pt + epot + ekin,
-        (pt + epot + ekin) / -pt,
-        lost_energy
-        );
-    fprintf(get_file(FILE_OUTPUT),
-            "######## %1.4e steps\t%1.4e blocks\t%1.4e approach checks\t%1.4e approach reduces\n",
+            t_total(parts[1].t),
+            -pt,
+            pt + epot + ekin,
+            (pt + epot + ekin) / -pt,
+            lost_energy
+            );
+
+    fprintf(get_file(FILE_OUTPUT), "######## %1.4e steps\t%1.4e blocks\t%1.4e approach checks\t%1.4e approach reduces\n",
             count_steps + count_steps_over, count_blocks + count_blocks_over,
             _help[0], _help[1]);
 
     output_stepsize();
-
     #ifdef USE_GRAPE
     if(method == 'i')
-    {
         g6_close(C_GRAPE_CLUSID);
-    }
     #endif
-
     _exit_function();
 }
+
+
 
 void sigproc(int signal)
 {
