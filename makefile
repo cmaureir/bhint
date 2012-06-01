@@ -11,24 +11,20 @@ LIBS=
 #LIBS=-lg2c -lsse -lg6lx
 #LIBS=-lg2c -lsse -lg6a_new
 
-CFLAGS=-Wall -O3 -I /opt/SUNWhpc/include
+CFLAGS=-Wall -O3
 CC=gcc
 CC_FORTRAN=gcc
 GET=co
 OBJS=bhi_int.o  bhi_io.o  bhi_kepler.o  bhi_sse.o  bhi_timestep.o  bhi_util.o  bhi_vector.o
-
 DEPEND= makedepend $(CFLAGS)
-
 LDFLAGS=-L . -L /opt/SUNWhpc/lib $(G2C) $(LIBS) -lm
 
-default: bhint
 
-bhi_main.o: bhi_main.c FORCE
+all: bhint
+
+bhi_main.o: bhi_main.c
 	$(CC) $(CFLAGS) -c bhi_main.c
 
-
-FORCE:
-	
 clean:
 	rm -f *.o bhint
 
