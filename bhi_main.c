@@ -384,7 +384,7 @@ void integrate( struct particle parts[], int pcount,
     }
 
     //
-    // Read from dump file and continue if it's necessary
+    // Read from dump file and continue if it's necessary restart the integration.
     //
     if(dumpfile != NULL)
     {
@@ -503,8 +503,7 @@ void integrate( struct particle parts[], int pcount,
                     orb_count, order, init, count_steps, count_steps_over, count_blocks, count_blocks_over, force_print);
             fprintf(dumpfile,
                     "INTEGRATE-PARAMS %32d\t%32d\t%32d\t%1.32le\t%1.32le\n",
-                    pcount, method, print, orbits, t_steps
-                    );
+                    pcount, method, print, orbits, t_steps);
             fprintf(dumpfile, "ENERGY %1.32le\n", lost_energy);
             fprintf(dumpfile, "PARTICLES ");
             i = fwrite(parts, sizeof(struct particle), pcount, dumpfile);
@@ -527,6 +526,7 @@ void integrate( struct particle parts[], int pcount,
         switch(method)
         {
             case 'i':
+                printf("ENTRAMOS A CASE i\n");
                 steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
                 break;
         }
@@ -842,7 +842,8 @@ int main(int argc, char **argv)
         switch(mode)
         {
             case 's':
-                /* single run */
+                // Default single run
+                // with the option 'i' to integrate teh data
                 integrate(*parts, pcount, method, 1, orbits, t_steps, NULL, 0);
                 break;
 
