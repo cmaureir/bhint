@@ -209,7 +209,10 @@ void predict_part_hermite2(struct particle *p, double t)
     double dtn, dt2n, dt3n, dt4n, dt5n;
 
     dt = t - p->t;
-    dt2 = dt * dt  * .5;	dt3 = dt * dt2 * _1_3; dt4 = dt * dt3 * .25; dt5 = dt * dt4 * .2;
+    dt2 = dt * dt  * .5;
+    dt3 = dt * dt2 * _1_3;
+    dt4 = dt * dt3 * .25;
+    dt5 = dt * dt4 * .2;
     dtn = t - p->htlast;
     dt2n = dtn * dtn  * .5; dt3n = dtn * dt2n * _1_3; dt4n = dtn * dt3n * .25; dt5n = dtn * dt4n * .2;
 
@@ -218,10 +221,8 @@ void predict_part_hermite2(struct particle *p, double t)
     for(i = 0; i < DIMENSIONS; i++)
     {
         // orbital movement
-        p->xp[i] = p->x[i] + dt * p->v[i]  + dt2 * p->ha[i] + dt3 * p->ha_[i]
-                    + dt4 * p->ha_2[i] + dt5 * p->ha_3[i];
-        p->vp[i] = p->v[i] + dt * p->ha[i] + dt2 * p->ha_[i]
-                    + dt3 * p->ha_2[i] + dt4 * p->ha_3[i];
+        p->xp[i] = p->x[i] + (dt * p->v[i] ) + (dt2 * p->ha[i] ) + (dt3 * p->ha_[i]  )+ dt4 * p->ha_2[i] + (dt5 * p->ha_3[i]);
+        p->vp[i] = p->v[i] + (dt * p->ha[i]) + (dt2 * p->ha_[i]) + (dt3 * p->ha_2[i] )+ dt4 * p->ha_3[i];
         // perturbing forces
         p->xp[i] += dt2n * p->a[i] + dt3n * p->a_[i] + dt4n * p->a_2[i] + dt5n * p->a_3[i];
         p->vp[i] += dtn  * p->a[i] + dt2n * p->a_[i] + dt3n * p->a_2[i] + dt4n * p->a_3[i];
