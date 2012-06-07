@@ -1649,7 +1649,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
     }
 
     // hermite evaluator
-    printf("step_hermite_2 --- movecount: %d\n", movecount);
     for(j = 0; j < movecount; j++)
         evaluate_1_2(parts, *pcount, active[j],node_posmin, node_posmax, forceterm[j].a, forceterm[j].a_);
 

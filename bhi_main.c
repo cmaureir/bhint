@@ -461,19 +461,12 @@ void integrate( struct particle parts[], int pcount,
         get_reduced(parts, 1, &orig_e, &orig_a, &orig_t, &orig_j);//red_, red_+1, red_+2, red_+3);
         t_max = (orbits >= 0) ? (double)orbits * orig_t : -orbits;
 
-        //
-        // TO DO: Paralelizar
-        //
-        printf("pcount: %d\n", pcount);
         for(j = 1; j < pcount; j++)
         {
             evaluate_1_2(parts, pcount, j, 0, 0, parts[j].ha, parts[j].ha_);
             evaluate_1_2(parts, pcount, j, 1, pcount - 1, parts[j].a, parts[j].a_);
             parts[j].dt = normalize_dt(parts[j].t, get_timestep_central(parts, parts + j, MIN_EVALS) * .01);
         }
-        //
-        // END TO DO
-        //
         check_app(parts, pcount, .0);
 
         // print headlines
@@ -526,7 +519,6 @@ void integrate( struct particle parts[], int pcount,
         switch(method)
         {
             case 'i':
-                printf("ENTRAMOS A CASE i\n");
                 steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
                 break;
         }
