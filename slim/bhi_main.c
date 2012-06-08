@@ -494,6 +494,7 @@ void integrate( struct particle parts[], int pcount,
                         fprintf(get_file(FILE_WARNING), "### PROBLEM WRITING DUMP FILE: WROTE %d OF %d PARTICLES\n", i, pcount);
                         fflush(get_file(FILE_WARNING));
                     }
+
                     fclose(dumpfile);
                     lastdump = time(NULL);
 
@@ -525,31 +526,30 @@ void integrate( struct particle parts[], int pcount,
         }
         #endif
 
-
-
         if(t_steps < 0)
         {
             // count apocenter passage
             predict(parts, pcount, parts[1].t);
             rv_ = (parts[1].xp[0]-parts[0].xp[0])*(parts[1].vp[0]-parts[0].vp[0])
                     + (parts[1].xp[1]-parts[0].xp[1])*(parts[1].vp[1]-parts[0].vp[1])
-                       + (parts[1].xp[2]-parts[0].xp[2])*(parts[1].vp[2]-parts[0].vp[2]);
+                    + (parts[1].xp[2]-parts[0].xp[2])*(parts[1].vp[2]-parts[0].vp[2]);
             if(rv_ != 0 && rv != 0)
             {
-                if(rv_ < 0 && rv > 0) // 1st parti cle at apocenter
-                //if(rv_ > 0 && rv < 0) // 1s  t particle at pericenter
+                if(rv_ < 0 && rv > 0) // 1st particle at apocenter
+                //if(rv_ > 0 && rv < 0) // 1st particle at pericenter
                 {
                     if(t_steps < 0)
                     {
-                              force_print = output(force_print ? -1 : print, parts, pcount, t_old, pt, parts[1].t,
-                                                   t_over, orbits, t_steps, t_max, count_steps + count_steps_over,
+                        force_print = output(force_print ? -1 : print, parts, pcount, t_old, pt, parts[1].t,
+                                                t_over, orbits, t_steps, t_max, count_steps + count_steps_over,
                                                 count_blocks + count_blocks_over, orb_count);
                         if(!force_print) printed = 1;
                     }
                     orb_count++;
-                    del_t = (parts[1].t +t_over) / orb_count / orig_t;
+                    del_t = (parts[1].t+t_over) / orb_count / orig_t;
                 }
-             }
+            }
+
             if(rv_ != 0) rv = rv_;
         }
         if(parts[1].t > t_maxval)
@@ -571,16 +571,16 @@ void integrate( struct particle parts[], int pcount,
                     }
                     t_over += t_maxval;
                     fprintf(get_file(FILE_WARNING),"### [%1.12e] reset time by %e (%e system units) ###\n",
-                        t_total(.0), convert_time(t_maxval, 0), t_maxval);
+                            t_total(.0), convert_time(t_maxval, 0), t_maxval);
                 }
-            }
+       }
 
         if(t_old < t_max && parts[1].t + t_over >= t_max)
             force_print = 1;
         if(t_steps >= 0 )// && parts[1].t > 0)
         {
             force_print = output(force_print ? -1 : print, parts, pcount, t_old, pt, parts[1].t, t_over, orbits, t_steps,
-                            t_max, count_steps + count_steps_over, count_blocks + count_blocks_over, orb_count);
+                                 t_max, count_steps + count_steps_over, count_blocks + count_blocks_over, orb_count);
             if(!force_print) printed = 1;
         }
         // Counter

@@ -250,11 +250,18 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[j].x, (*parts)[j].x + 1, (*parts)[j].x + 2,
                     (*parts)[j].v, (*parts)[j].v + 1, (*parts)[j].v + 2);
 
+
                     if((*parts)[j].m < 0)
                     {
                         (*parts)[j].m = -(*parts)[j].m;
+                        (*parts)[j].sse_multiple = 2;
                     }
 
+                    else
+                    {
+                        (*parts)[j].sse_multiple = 1;
+                    }
+                    //#endif
                     (*parts)[j].m /= _conv_m;
                     (*parts)[j].x[0] /= _conv_x;
                     (*parts)[j].x[1] /= _conv_x;
@@ -301,6 +308,8 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[j].ha_[i]   = .0;
                     (*parts)[j].ha_2[i]  = .0;
                     (*parts)[j].ha_3[i]  = .0;
+                    (*parts)[j].gr_a[i]  = .0;
+                    (*parts)[j].gr_a_[i] = .0;
                     (*parts)[j].r      = v_abs((*parts)[j].x);
                     (*parts)[j].xv     = scal_prod((*parts)[j].x, (*parts)[j].v);
                     (*parts)[j].rmin   = 1.e99;
@@ -309,6 +318,8 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[j].r_peri = -1.;
                 }
 
+                (*parts)[j].v_thresh_2 = .0;
+                (*parts)[j].use_pn     = 0;
                 (*parts)[j].phi_stars    = .0;
                 (*parts)[j].phi_bgr    = .0;
                 (*parts)[j].t      = .0;
@@ -585,7 +596,7 @@ int output( int print, struct particle parts[], int pcount,
                         #endif
                         , p->energy
                         , p->energy + p->m * (.5 * p->phi_stars /*+ p->phi_bgr*/)
-                        , 1
+                        , p->sse_multiple
                         );
 
                 p->rmin = 1.e99;

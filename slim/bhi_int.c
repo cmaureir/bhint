@@ -69,7 +69,7 @@ struct t_close *close_list = NULL;
 int active[N_MAX], remove_part[N_MAX], movecount;
 
 static int node_posmin=-1, node_posmax=-1;
-static double _1_3 = 1. / 3.,_sqrt_mratio = .0;
+static double _1_3 = 1. / 3., _1_6 = 1. / 6., _1_12 = 1. / 12., _1_14 = 1. / 14., _sqrt_mratio = .0;
 
 static double step_size[2*MAX_STEPSIZE_POWER];
 static int step_alloc[2*MAX_STEPSIZE_POWER], step_count[2*MAX_STEPSIZE_POWER],
@@ -231,6 +231,12 @@ void predict_part_hermite2(struct particle *p, double t)
         // perturbing forces
         p->xp[i] += dt2n * p->a[i] + dt3n * p->a_[i] + dt4n * p->a_2[i] + dt5n * p->a_3[i];
         p->vp[i] += dtn  * p->a[i] + dt2n * p->a_[i] + dt3n * p->a_2[i] + dt4n * p->a_3[i];
+        // relativistic forces
+        if(p->use_pn)
+        {
+            p->xp[i] += dt2n * p->gr_a[i] + dt3n * p->gr_a_[i] + dt4n * p->gr_a_2[i] + dt5n * p->gr_a_3[i];
+            p->vp[i] += dtn  * p->gr_a[i] + dt2n * p->gr_a_[i] + dt3n * p->gr_a_2[i] + dt4n * p->gr_a_3[i];
+        }
     }
 
     _exit_function();
@@ -468,6 +474,186 @@ void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
 }
 // END
 // find_move_particles
+
+//
+// gr_force_com
+//
+#ifdef PN
+void gr_force_com(double m2, double m1, double _x[3], double v[3], double a[3])
+{
+    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GR_FORCE_COM);
+    //double __v2 = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    double m, nu;
+    int k;
+    #ifdef NO_USE_MASS_SUM
+    m = m2;
+    nu = m1 / m2;
+    #else
+    m = m1 + m2;
+    nu = m1 * m2 / (m * m);
+    #endif
+    double _1_r2 = 1. / (_x[0] * _x[0] + _x[1] * _x[1] + _x[2] * _x[2]);
+    double _1_r  = sqrt(_1_r2), _1_r3 = _1_r * _1_r2;
+    double n[3]  = {_x[0] * _1_r, _x[1] * _1_r, _x[2] * _1_r};
+    double v_2   = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    double nv    = n[0] * v[0] + n[1] * v[1] + n[2] * v[2];
+    #ifdef PN1
+    double pn1_a = -v_2  * (1 + 3.*nu) + 1.5 * nv*nv * nu + m * _1_r * (4. + nu + nu);
+    double pn1_b = nv * (4. - nu - nu);
+    #endif
+    #ifdef PN2
+    double nv2 = nv * nv;
+    double pn2_a = -2.*v_2*v_2 + 1.5*v_2*nv2*(3.-4.*nu) - 1.875*nv2*nv2*(1-3.*nu);
+    double pn2_b = .5*v_2*nu*(11.+4.*nu) + 2.*nv2*(1. + nu*(12.+3.*nu));
+    double pn2_c = (8.*v_2 - 1.5*nv2*(3.+nu+nu))*nv;
+    #endif
+    #ifdef PN25
+    double pn25_a = v_2 + 3. * m * _1_r;
+    double pn25_b = 3. * v_2 + _17_3 * m * _1_r;
+    #endif
+    for(k = 0; k < 3; k++)
+    {
+        a[k] = .0;
+        #ifdef PN1
+        a[k] += m * _1_r2 * (n[k] * pn1_a + v[k] * pn1_b) * __1_c2;
+        #endif
+        #ifdef PN2
+        a[k] += m * _1_r2 * (n[k] * (nu * pn2_a + m * _1_r * pn2_b - m * m * _1_r2 * (9. + 21.75 * nu))
+                   + v[k] * (nu * pn2_c - .5 * m * _1_r * nv * (4. + 43.*nu))) * __1_c4;
+        #endif
+        #ifdef PN25
+        a[k] -= 1.6 * m * m * _1_r3 * nu * (v[k] * pn25_a - n[k] * nv * pn25_b) * __1_c5;
+        #endif
+    }
+
+    _exit_function();
+}
+// END
+// gr_force_com
+
+//
+// gr_jerk_com
+//
+void gr_jerk_com(double m2, double m1, double _x[3], double v[3], double an[3], double ha[3], double gr_a[3], double a_[3])
+{
+    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GR_JERK_COM);
+    //double __v2 = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    double m, nu;
+    // double a[3] = {an[0] + ha[0] + gr_a[0], an[1] + ha[1] + gr_a[1], an[2] + ha[2] + gr_a[2]};
+    double a[3] = {ha[0] + gr_a[0], ha[1] + gr_a[1], ha[2] + gr_a[2]};
+    int k;
+
+    #ifdef NO_USE_MASS_SUM
+    m = m2;
+    nu = m1 / m2;
+    #else
+    m = m1 + m2;
+    nu = m1 * m2 / (m * m);
+    #endif
+    double _1_r2 = 1. / (_x[0] * _x[0] + _x[1] * _x[1] + _x[2] * _x[2]);
+    double _1_r  = sqrt(_1_r2), _1_r3 = _1_r * _1_r2;
+    double n[3]  = {_x[0] * _1_r,  _x[1] *  _1_r,  _x[2] * _1_r};
+    double v_2   =  v[0] *  v[0] +  v[1] *  v[1] +  v[2] * v[2];
+    double v_2_  =    2. * (v[0] *  a[0] +  v[1] *  a[1] + v[2] * a[2]);
+    double nv    =  n[0] *  v[0] +  n[1] *  v[1] +  n[2] * v[2];
+    double na    =  n[0] *  a[0] +  n[1] *  a[1] +  n[2] * a[2];
+    double xv    = _x[0] *  v[0] + _x[1] *  v[1] + _x[2] * v[2];
+    double n_[3] = {v[0] *  _1_r -    xv * _x[0] * _1_r3,  v[1] * _1_r - xv * _x[1] * _1_r3, v[2] * _1_r - xv * _x[2] * _1_r3};
+    double n_v   = n_[0] *  v[0] + n_[1] *  v[1] + n_[2] * v[2];
+    double nv_   = na + n_v;
+    #ifdef PN1
+    double pn1_a  = -v_2  * (1 + 3.*nu) + 1.5 * nv *  nv * nu + m * _1_r * (4. + 2.*nu);
+    double pn1_a_ = -v_2_ * (1 + 3.*nu) +  3. * nv * nv_ * nu - m *   xv * _1_r3 * (4. + 2.*nu);
+    double pn1_b  =  nv  * (4. - 2.*nu);
+    double pn1_b_ =  nv_ * (4. - 2.*nu);
+    #endif
+    #ifdef PN2
+    double nv2 = nv * nv;
+    double pn2_a1  = -2. *  v_2 *  v_2 + 1.5*v_2*nv2*(3.-4.*nu) - 1.875*nv2*nv2*(1-3.*nu);
+    double pn2_a1_ = -4. *  v_2 * v_2_ + 1.5*v_2_*nv2*(3.-4.*nu) + 3.*v_2*nv*nv_*(3.-4.*nu) - 7.5*nv2*nv*nv_*(1-3.*nu);
+    double pn2_a2  = .5  *  v_2 *   nu * (11.+4.*nu)  + 2.*nv2*(1. + nu*(12.+3.*nu));
+    double pn2_a2_ = .5  * v_2_ *   nu * (11.+4.*nu) + 4.*nv*nv_*(1. + nu*(12.+3.*nu));
+    double pn2_a   = nu  * pn2_a1  + m * _1_r * pn2_a2 - m * m * _1_r2 * (9. + 21.75 * nu);
+    double pn2_a_  = nu  * pn2_a1_ + m * _1_r * pn2_a2_ - m * _1_r3 * xv * pn2_a2 + 2. * m * m * _1_r2 * _1_r2 * xv * (9. + 21.75 * nu);
+    double pn2_b1  =  8. * v_2  * nv - 1.5*nv2*nv*(3.+2.*nu);
+    double pn2_b1_ =  8. * v_2_ * nv + 8.*v_2*nv_ - 4.5*nv2*nv_*(3.+nu+nu);
+    double pn2_b   = nu  * pn2_b1  - .5 * m * _1_r *  nv * (4. + 43.*nu);
+    double pn2_b_  = nu  * pn2_b1_ - .5 * m * _1_r * nv_ * (4. + 43.*nu) + .5 * m * _1_r3 * xv * nv * (4. + 43.*nu);
+    #endif
+    #ifdef PN25
+    double pn25_a  = v_2 + 3. * m * _1_r;
+    double pn25_a_ = v_2_ - 3. * m * xv * _1_r3;
+    double pn25_b  = 3. * v_2 + _17_3 * m * _1_r;
+    double pn25_b_ = 3. * v_2_ - _17_3 * m * xv * _1_r3;
+    #endif
+    for(k = 0; k < 3; k++)
+    {
+        a_[k] = .0;
+        #ifdef PN1
+        a_[k] += m * _1_r2 * (n_[k] * pn1_a + n[k] * pn1_a_
+                    + a[k] * pn1_b + v[k] * pn1_b_ - 2. * _1_r2 * xv * (n[k] * pn1_a + v[k] * pn1_b)) * __1_c2;
+        #endif
+        #ifdef PN2
+        a_[k] += m * _1_r2 * (n_[k] * pn2_a + n[k] * pn2_a_ + a[k] * pn2_b + v[k] * pn2_b_
+                    - 2. * xv * _1_r2 * (n[k] * pn2_a + v[k] * pn2_b)) * __1_c4;
+        #endif
+        #ifdef PN25
+        a_[k] -= 1.6*m*m*_1_r3*nu * (a[k] * pn25_a + v[k] * pn25_a_ - n_[k] * nv * pn25_b - n[k] * nv_ * pn25_b - n[k] * nv * pn25_b_
+                       - 3. * xv * _1_r2 * (v[k] * pn25_a - n[k] * nv * pn25_b)) * __1_c5;
+        #endif
+    }
+    _exit_function();
+}
+#endif // PN
+// END
+// gr_jerk_com
+
+//
+// path_integral
+//
+void path_integral(int order, double dt, struct particle *p, double sign)
+{
+    _enter_function(_UL_HERMITE2, _UL_HERMITE2_PATH_INTEGRAL);
+
+    double a[3]   = {p->a[0]   + p->ha[0]   + p->gr_a[0],   p->a[1]   + p->ha[1]   + p->gr_a[1],   p->a[2]   + p->ha[2]   + p->gr_a[2]};
+    double a_[3]  = {p->a_[0]  + p->ha_[0]  + p->gr_a_[0],  p->a_[1]  + p->ha_[1]  + p->gr_a_[1],  p->a_[2]  + p->ha_[2]  + p->gr_a_[2]};
+    double a_2[3] = {p->a_2[0] + p->ha_2[0] + p->gr_a_2[0], p->a_2[1] + p->ha_2[1] + p->gr_a_2[1], p->a_2[2] + p->ha_2[2] + p->gr_a_2[2]};
+
+    switch(order)
+    {
+        case 0:
+            break;
+        case 1:
+            //     trapezium rule              // F =     1/2 * (x1 - x0)   * (y1    + y0   )
+            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a)));
+            break;
+        case 3:
+            //     PN_TRACK_3RD                // F =     1/2 * (x1 - x0)   * (y1    + y0   )
+                                               //       -1/12 * (x1 - x0)^2 * (y1'   - y0'  )
+            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a) + sign * _1_6 * dt * (scal_prod(a, p->gr_a) + scal_prod(p->v, p->gr_a_))));
+            break;
+        case 5:
+            //     PN_TRACK_5TH                // F =     1/2 * (x1 - x0)   * (y1    + y0   )
+                                               //       -1/10 * (x1 - x0)^2 * (y1'   - y0'  )
+                                               //      +1/120 * (x1 - x0)^3 * (y1(2) + y0(2))
+            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a) + sign * .2 * dt * (scal_prod(a, p->gr_a) + scal_prod(p->v, p->gr_a_)
+                                 + sign * _1_12 * dt * (scal_prod(a_, p->gr_a) + 2. * scal_prod(a, p->gr_a_) + scal_prod(p->v, p->gr_a_2)))));
+            break;
+        case 7:
+            //     PN_TRACK_7TH                // F =     1/2 * (x1 - x0)   * (y1    + y0   )
+                                               //       -3/28 * (x1 - x0)^2 * (y1'   - y0'  )
+                                               //       +1/84 * (x1 - x0)^3 * (y1(2) + y0(2))
+                                               //     -1/1680 * (x1 - x0)^4 * (y1(3) - y0(3))
+            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a) + sign * _1_14 * dt * (3 * (scal_prod(a, p->gr_a) + scal_prod(p->v, p->gr_a_))
+                            + sign * _1_3 * dt * (scal_prod(a_, p->gr_a) + 2. * scal_prod(a, p->gr_a_) + scal_prod(p->v, p->gr_a_2)
+                            + sign * .05 * dt * (scal_prod(a_2, p->gr_a) + 3. * scal_prod(a_, p->gr_a_) + 3. * scal_prod(a, p->gr_a_2)
+                            + scal_prod(p->v, p->gr_a_3))))));
+    }
+    _exit_function();
+}
+// END
+// path_integral
+
 
 //
 // move_kepler
@@ -1147,7 +1333,7 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                 {
                     fprintf(get_file(FILE_WARNING),
                         "# MERGE: m1 = %e\tr1 = %e\tm2 = %e\tr2 = %e\tr = %e pc = %e Rsun\tv = %e pc/Myr\n",
-                        convert_mass(p->m,  0), .0, convert_mass(pk->m, 0), .0, convert_length(v_dist(p->x, pk->xp, 1), 0),
+                        convert_mass(p->m,  0), p->sse_r, convert_mass(pk->m, 0), pk->sse_r, convert_length(v_dist(p->x, pk->xp, 1), 0),
                         convert_length(v_dist(p->x, pk->xp, 1), 0) * 206265. / 4.7e-3, convert_length(convert_time(v_dist(p->v, pk->vp, 1), 1), 0) * 1.e6
                         );
                     /*
@@ -1177,6 +1363,10 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                       pk->dt = p->dt;
                     pk->htlast = pk->t = tmin;
                     pk->m += p->m;
+
+                    // stellar collision
+                    pk->sse_mass += p->sse_mass / ((double) p->sse_multiple);
+                    pk->sse_mt += p->sse_mt / ((double) p->sse_multiple);
 
                     pk->energy += pk->m * (.5 * (scal_prod(pk->v, pk->v) + pk->phi_stars) + p->phi_bgr - parts[0].m / v_abs(pk->x));
                     // only valid if pk->phi is up to date (i.e. pk is active and USE_GRAPE ?)
