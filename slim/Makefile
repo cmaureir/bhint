@@ -19,7 +19,7 @@ bhi_main.o: bhi_main.c
 	$(CC) $(CFLAGS) -c bhi_main.c
 
 clean:
-	rm -f *.o bhint
+	rm -f *.o bhint gmon.out
 
 cleanall: clean
 	make -C clean
