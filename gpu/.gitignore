@@ -1,0 +1,6 @@
+TIME
+*.out
+*.detail
+*.dump
+*.debug
+*.o
