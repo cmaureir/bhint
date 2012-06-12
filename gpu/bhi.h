@@ -12,10 +12,6 @@
 #define M_ENCL_IO(r) .0
 #endif
 
-#ifdef USE_GRAPE
-#include "grape6.h"
-#endif
-
 #define min(x, y) ((x) <= (y) ? (x) : (y))
 
 #define DIMENSIONS     3
@@ -64,13 +60,6 @@
 #define C_2G_C2                (__C_2G_C2_DAY2AU2 * CONVINT_X_AU * CONVINT_X_AU / (CONVINT_T_DAY * CONVINT_T_DAY))
 #define C_C                    (__C_C_AUDAY / CONVINT_X_AU * CONVINT_T_DAY)
 
-#ifdef USE_GRAPE
-#define C_GRAPE_CLUSID   0
-#define C_GRAPE_MAX_T_2  4.e2 //1.5e3  // 400 yrs
-#define C_GRAPE_XUNIT    (63 - (int)(ceil(log(convert_length(MAX_X * 1.1,   1)) / log(2.))))
-#define C_GRAPE_TUNIT    (63 - (int)(ceil(log(convert_time  (C_GRAPE_MAX_T_2 * 4.002, 1)) / log(2.))))
-#endif
-
 #define FILE_OUTPUT   1
 #define FILE_DETAIL   2
 #define FILE_DEBUG    3
@@ -93,7 +82,6 @@
 
 enum _module {_UL_NBODY=0, _UL_HERMITE2, _UL_IO, _UL_TIMESTEP, _UL_KEPLER};
 
-#define SIGNAL_FREE_GRAPE -1
 #define SIGNAL_PRINT_POS  -10
 
 extern int _global_module, _global_function;
@@ -155,11 +143,9 @@ struct particle {
   double gr_a_2[3], gr_a_3[3], v_thresh_2;
   int switch_pn;
 
-  //#ifdef USE_SSE
   int sse_on, sse_kw;
   double sse_mass, sse_mt, sse_epoch, sse_tphys, sse_z, sse_dtm, sse_r;
   int sse_multiple;
-  //#endif
 };
 
 /*
@@ -235,7 +221,6 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
 double get_timestep_aarseth(double a[3], double a_[3], double a_2[3], double a_3[3], double eta);
 double get_timestep_central(struct particle *parts, struct particle *p, double min_evals);
 void predict_part_hermite2(struct particle *p, double t);
-void grape_send_particle(struct particle *p, int index);
 void check_app(struct particle *parts, int pcount, double t);
 void add_force_extpot(double x[3], double v[3], double a[3], double a_[3], double *phi);
 int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_evals, double *t_eval);

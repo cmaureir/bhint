@@ -24,16 +24,6 @@
                                    // ********** CONFIGURE BELOW **********
 
 
-/*          ************* GRAPE **************          */
-//#define USE_GRAPE                  // Use GRAPE hardware. Requires GRAPE library and header file grape6.h.
-                                   // ********** CONFIGURE BELOW **********
-
-
-/*          ******* STELLAR EVOLUTION ********          */
-//#define USE_SSE                    // Use single stellar evolution
-                                   // ********** CONFIGURE BELOW **********
-
-
 /*          ******* USE PN TREATMENT *********          */
 //#define PN                         // Use post-Newtonian treatment
                                    // ********** CONFIGURE BELOW **********
@@ -59,7 +49,6 @@
 #define N_MAX            150000    // maximum number of particles
 
 #define MAX_X            10.       // Maximum central distance in pc (particle will be removed if further out)
-                                   // Essential also for use of GRAPE using fixed-point arithmetics.
 
 #define BINARY_FRACTION  .0        // fraction of stars marked as binaries (i.e., with double initial mass)
                                    // for model creation only
@@ -164,50 +153,6 @@
 
 /******************************************************************************/
 
-#ifdef USE_GRAPE
-
-/******************************************************************************
- *
- * GRAPE parameters.
- *
- * RHO_... parameters define the number density of the model.
- * Used for GRAPE neighbour spheres to estimate number of particles in the sphere,
- * since GRAPE may cause problems with too many neighbours.
- *
- * Requires RHO_N_0 and RHO_N_3(r) such that the number density of model particles is
- *
- *   RHO(r) = RHO_N_0 / RHO_N_3(r)^3
- *
- * in internal units.
- *
- * Following parameters represent the findings of Schoedel et al. (A&A 469, 125 (2007), Eq. 7),
- * where the mass density is rho(x) = 2.8e6 * (r/ME_R0)^ME_GAMMA,
- * with ME_R0 and ME_GAMMA as above.
- *
- ******************************************************************************/
-
-
-#define T_GRAPEFREE_INTERVAL 1200  // in seconds of wall-clock time
-
-#define C_MAX_NEIGHB     100.      // maximum number of neighbours allowed (may cause problem with GRAPE if too high)
-                                   // choose as high as possible for maximum performance (maximum step size)
-
-#define RHO_RHO0         2.8e6     // mass density at break radius in M_sun pc^-3
-#define RHO_MEANMASS     15.       // mean stellar mass in M_sun (to convert to number density)
-
-                                   // number density of model particles at break radius in pc^-3
-#define RHO_N0_EXTERNAL  (RHO_RHO0 / RHO_MEANMASS)
-
-                                   // RHO0 converted to internal units and number density
-#define RHO_N_0          convert_length(convert_length(convert_length(RHO_N0_EXTERNAL, 0), 0), 0)
-
-                                   // RHO_N_3(x) = F(x)^(-1/3), such that RHO(x) = RHO_N_0 * F(x)
-#define RHO_N_3(r)       pow(r / convert_length(ME_R0, 1), -_1_3 * (r < convert_length(ME_R0, 1) ? ME_GAMMA1 : ME_GAMMA2))
-
-/******************************************************************************/
-
-#endif // USE_GRAPE
-
 #ifdef PN
 
 /******************************************************************************
@@ -259,23 +204,6 @@
 /***** PN ALWAYS ON *****/
 //#define SWITCHON_PN  1
 //#define SWITCHOFF_PN 0
-
-/******************************************************************************/
-
-#endif
-
-#ifdef  USE_SSE
-
-/******************************************************************************
- *
- * Parameters for stellar evolution.
- *
- ******************************************************************************/
-
-#define N_MAX_SSE     N_MAX_DETAIL // maximum particle name for stellar evolution, 0 or -1 for none, -2 for all
-#define MAX_SSE_MASS  200          // particles above this limit are assumed to be black holes and not evolved at all
-#define SSE_Z         .02          // initial stellar metallicity
-//#define SSE_R_COLL                 // merge stars when they touch - WARNING: consider giants [TESTING]
 
 /******************************************************************************/
 

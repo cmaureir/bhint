@@ -13,10 +13,8 @@
 
 #define CLOSE_MAX     100          // (initial) maximum number of neighbours; is increased dynamically
 //#define DT_AARSETH_ALL
-#define MAX_GRAPE_RESEND     5     // maximum number of retries if GRAPE fails
 #define WARN_ENERGY_FACT .2
 //#define WARN_ENERGYALL
-//#define GRAPE_CHECK_NEIGHBOURS
 #define MAX_REDUCECOUNT 3
 
 #ifdef PN
@@ -56,13 +54,11 @@ gettimeofday(&start, NULL);
 gettimeofday(&finish, NULL);\
 *t_eval += (double)(finish.tv_sec - start.tv_sec) + 1.e-6*(finish.tv_usec - start.tv_usec);
 
-#ifndef USE_GRAPE
 struct t_forceterm {
     double a[3], a_[3];
 };
 struct t_forceterm forceterm[N_MAX];
 struct t_forceterm forcesum[N_MAX];
-#endif
 
 struct t_close {
     struct particle *p, *pk;
@@ -82,20 +78,14 @@ static double _1_LOG2 = -1.;
 static int collisions, max_collisions=0;
 static struct particle ***coll_vector=NULL;
 
-#ifdef USE_GRAPE
-static time_t t_last_grapefree;
-static double dt_neighb_fact;
-int grape_npipes = -1;
-#endif
-
 #define PERTURBING_FORCE_RATIO .3  // at which ratio of central force is a particle perturber?
 
 enum _function {_UL_HERMITE2_REGISTER_DT=0, _UL_HERMITE2_INIT_DT, _UL_HERMITE2_PREDICT_PART, _UL_HERMITE2_ADD_CLOSE,
                 _UL_HERMITE2_ADD_COLLISION, _UL_HERMITE2_EVALUATE_1, _UL_HERMITE2_CHECK_APP, _UL_HERMITE2_CORRECT_TIMESTEP,
                 _UL_HERMITE2_FIND_MOVE_PARTICLES, _UL_HERMITE2_GR_FORCE_COM, _UL_HERMITE2_GR_JERK_COM, _UL_HERMITE2_GR_FORCE,
                 _UL_HERMITE2_GR_JERK, _UL_HERMITE2_PATH_INTEGRAL, _UL_HERMITE2_MOVE_KEPLER, _UL_HERMITE2_HERMITE_CORRECT,
-                _UL_HERMITE2_FIND_TIMESTEPS, _UL_HERMITE2_HERM_PRED, _UL_HERMITE2_GRAPE_SEND_PARTICLE, _UL_HERMITE2_GRAPE_INIT,
-                _UL_HERMITE2_FIND_NEIGHBOURS, _UL_HERMITE2_GRAPE_GETFORCES, _UL_HERMITE2_STEP_HERMITE, _UL_HERMITE2_XXXXXXXXX,
+                _UL_HERMITE2_FIND_TIMESTEPS, _UL_HERMITE2_HERM_PRED,
+                _UL_HERMITE2_FIND_NEIGHBOURS,  _UL_HERMITE2_STEP_HERMITE, _UL_HERMITE2_XXXXXXXXX,
                 _G6_SET_TI, _G6_CALC_FIRSTHALF, _G6_CALC_LASTHALF, _G6_READ_NEIGHBOUR_LIST,
                 _G6_GET_NEIGHBOUR_LIST, _UL_HERMITE2_ADD_FORCE_EXTPOT};
 
@@ -436,7 +426,6 @@ void correct_timestep(struct particle *parts, int pcount, double tmin)
 //
 // sumforce
 //
-#ifndef USE_GRAPE
 void sumforce(struct particle *parts)
 {
     int i, j;
@@ -452,7 +441,6 @@ void sumforce(struct particle *parts)
         }
     }
 }
-#endif
 // END
 // sumforce
 
@@ -481,10 +469,6 @@ void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
             p->dt = tmin - p->htlast;
             p->io_steps_p++;
             p->dtnext = 2.001 * p->dt;
-            #ifdef USE_GRAPE
-            if(p->dtnext > C_GRAPE_MAX_T_2)
-                p->dtnext = 1.0005 * C_GRAPE_MAX_T_2;
-            #endif
         }
         step_count[step_min] = 0;
     }
@@ -724,15 +708,7 @@ void move_kepler(struct particle *parts, int pcount, double tmin)
                 #endif
 
                 step_kepler_1(parts, pcount, p - parts, dt, p->ha, p->ha_, p->ha_2,
-                        #ifdef USE_GRAPE
-                        #ifdef DT_AARSETH_ALL
                         p->ha_3
-                        #else
-                        NULL
-                        #endif
-                        #else
-                        p->ha_3
-                        #endif
                         , &(p->curr_a), &(p->curr_e));
 
                 #ifdef PN_KEPLER
@@ -918,7 +894,6 @@ void find_timesteps(struct particle *parts, int pcount, double tmin, double eta,
         #endif // NOT DT_AARSETH_ALL
 
         // allow timestep to double at maximum
-        // GRAPE:    also limit to max. number of neighbours
         if(p->dtnext < dt)
             dt = p->dtnext;
 
@@ -946,7 +921,6 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
     int i;
     struct particle *p;
 
-    #ifndef USE_GRAPE
     for(p = parts + 1; p < parts + pcount; p++)
     {
         if(!p->active && (p->t <= tmin - DT_TOLERANCE))
@@ -976,407 +950,11 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
             }
         }
     }
-    #else // USE_GRAPE
-
-    if(pred_only)
-        for(p = parts + 1; p < parts + pcount; p++)
-        //if(!p->active)
-        {
-            dt = tmin - p->t;
-            dt2 = .5 * dt * dt; dt3 = dt * dt2 * _1_3; dt4 = .25 * dt * dt3;
-            for(i = 0; i < DIMENSIONS; i++)
-                p->xp[i] = p->x[i] + dt * p->v[i] + dt2 * (p->a[i] + p->ha[i])
-                                   + dt3 * (p->a_[i] + p->ha_[i]) + dt4 * (p->a_2[i] + p->ha_2[i]);
-        }
-
-     if(!pred_only)
-     {
-        int j;
-        double x;
-        for(j = 0; j < movecount; j++)
-        {
-            p = parts + active[j];
-            dt = p->dt;
-            dt2 = dt * dt  * .5; dt3 = dt * dt2 * _1_3; dt4 = dt * dt3 * .25; dt5 = dt * dt4 * .2;
-            for(i = 0; i < DIMENSIONS; i++)
-            {
-                p->x[i] += dt2 * p->a[i] + dt3 * p->a_[i];// + dt4 * p->a_2[i] + dt5 * p->a_3[i];
-                p->v[i] += dt  * p->a[i] + dt2 * p->a_[i];// + dt3 * p->a_2[i] + dt4 * p->a_3[i];
-                p->xp[i] = p->x[i];
-            }
-
-            // limit average number of neighbours:
-            // n = (v * 2dt)^3 * f_N(r) < x,  f_N(r) = rho(r)/m = M/m * (beta + 3)/(4 * pi * R^(beta + 3)) * r^beta
-            x = v_abs(p->x);
-
-            dt = (RHO_N_3(x) * dt_neighb_fact  - _sqrt_mratio * x) * .5 / (v_abs(p->v) + sqrt(2. * parts[0].m / x));
-            #ifndef DT_AARSETH_ALL
-            if(dt < p->dtnext)
-                p->dtnext = dt;
-            #endif
-        }
-    }
-    #endif // USE_GRAPE
 
     _exit_function();
 }
 // END
 // herm_pred
-
-
-//
-// grape_send_particle
-//
-#ifdef USE_GRAPE
-void grape_send_particle(struct particle *p, int index)
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GRAPE_SEND_PARTICLE);
-    double a2by18[3], a1by6[3], aby2[3];
-
-    a2by18[0] = (p->a_2[0] + p->ha_2[0]) / 18.;
-    a2by18[1] = (p->a_2[1] + p->ha_2[1]) / 18.;
-    a2by18[2] = (p->a_2[2] + p->ha_2[2]) / 18.;
-    a1by6[0]  = (p->a_[0]  + p->ha_[0])  / 6.;
-    a1by6[1]  = (p->a_[1]  + p->ha_[1])  / 6.;
-    a1by6[2]  = (p->a_[2]  + p->ha_[2])  / 6.;
-    aby2[0]   = (p->a[0]   + p->ha[0])   * .5;
-    aby2[1]   = (p->a[1]   + p->ha[1])   * .5;
-    aby2[2]   = (p->a[2]   + p->ha[2])   * .5;
-    g6_set_j_particle(C_GRAPE_CLUSID, index - 1, index, p->t, p->dt, p->m, a2by18, a1by6, aby2, p->v, p->x);
-    #ifdef PRINT_2
-    if(index == PRINT_1 || index == PRINT_2)
-    {
-        printf("### GRAPE SEND %4d:\tt  %e+%1.2e\tx0  %e\t%e\t%e\tx1p  %e\t%e\t%e\n",
-                index,
-                t_total(p->t),
-                convert_time(p->dt, 0),
-                convert_length(p->x[0], 0),
-                convert_length(p->x[0], 0),
-                convert_length(p->x[0], 0),
-                convert_length(p->x[0]
-                       + p->dt * p->v[0]
-                       + p->dt * p->dt * aby2[0]
-                       + p->dt * p->dt * p->dt * a1by6[0]
-                       + p->dt * p->dt * p->dt * p->dt * a2by18[0] *.75
-                       , 0),
-                convert_length(p->x[1]
-                       + p->dt * p->v[1]
-                       + p->dt * p->dt * aby2[1]
-                       + p->dt * p->dt * p->dt * a1by6[1]
-                       + p->dt * p->dt * p->dt * p->dt * a2by18[1] *.75
-                       , 0),
-                convert_length(p->x[2]
-                       + p->dt * p->v[2]
-                       + p->dt * p->dt * aby2[2]
-                       + p->dt * p->dt * p->dt * a1by6[2]
-                       + p->dt * p->dt * p->dt * p->dt * a2by18[2] *.75
-                       , 0));
-        fflush(stdout);
-    }
-    #endif
-    _exit_function();
-}
-// END
-// grape_send_particle
-
-//
-// grape_init
-//
-void grape_init(struct particle *parts, int pcount)
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GRAPE_INIT);
-    struct particle *p;
-
-    fprintf(get_file(FILE_DEBUG), "### INIT: Waiting for grape %d...\n", C_GRAPE_CLUSID);
-    fflush(get_file(FILE_DEBUG));
-    g6_open(C_GRAPE_CLUSID);
-    grape_npipes = g6_npipes();
-    g6_set_tunit(C_GRAPE_TUNIT);
-    g6_set_xunit(C_GRAPE_XUNIT);
-    fprintf(get_file(FILE_DEBUG), "### INIT: Initialized grape with %d pipes (tunit=%d, xunit=%d).\n", grape_npipes, C_GRAPE_TUNIT, C_GRAPE_XUNIT);
-    t_last_grapefree = time(NULL);
-    fflush(get_file(FILE_DEBUG));
-    g6_set_neighbour_list_sort_mode(0);
-    for(p = parts + 1; p < parts + pcount; p++)
-        grape_send_particle(p, p - parts);
-    dt_neighb_fact = pow(C_MAX_NEIGHB * 3. / (4. * M_PI * RHO_N_0), _1_3);
-    _exit_function();
-}
-// END
-// grape_init
-
-
-//
-// grape_getforces
-//
-void grape_getforces(struct particle *parts, int pcount, double time)
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GRAPE_GETFORCES);
-    int i, j, k, resent;
-    double grape_x[grape_npipes][3], grape_v[grape_npipes][3], grape_f[grape_npipes][3], grape_f_6[grape_npipes][3];
-    double grape_phi[grape_npipes], grape_h2[grape_npipes];
-    double x;
-    int grape_index[grape_npipes];
-    int nb[pcount-2], nnb[grape_npipes], nblen;
-    int reducecount;
-
-    struct particle *p;
-
-    _global_function = _G6_SET_TI;
-    g6_set_ti(C_GRAPE_CLUSID, time);
-    _global_function = _UL_HERMITE2_GRAPE_GETFORCES;
-
-    for(j = 0; j < movecount; j += grape_npipes)
-    {
-        _print_position(ul_kill, " GRAPE_GETFORCES-F1-1", j, movecount, grape_npipes, .0);
-
-        for(k = 0; k < grape_npipes; k++)
-        {
-            _print_position(ul_kill, " GRAPE_GETFORCES-F1-2", j, movecount, k, .0);
-            if(k + j >= movecount)
-            {
-                for(i = 0; i < 3; i++)
-                {
-                    _print_position(ul_kill, " GRAPE_GETFORCES-F1-3", j, k, i, .0);
-                    grape_x[k][i]   = grape_x[k-1][i];
-                    grape_v[k][i]   = grape_v[k-1][i];
-                    grape_f[k][i]   = grape_f[k-1][i];
-                    grape_f_6[k][i] = grape_f_6[k-1][i];
-                }
-                grape_phi[k]   = grape_phi[k-1];
-                grape_index[k] = grape_index[k-1];
-            }
-            else
-            {
-                _print_position(ul_kill, " GRAPE_GETFORCES-F1-4", j, movecount, grape_npipes, .0);
-                p = parts + active[k + j < movecount ? k + j : movecount - 1];
-                for(i = 0; i < 3; i++)
-                {
-                    grape_x[k][i]   = p->x[i];
-                    grape_v[k][i]   = p->v[i];
-                    grape_f[k][i]   = p->a[i];
-                    grape_f_6[k][i] = (p->a_[i] + p->dt * (p->a_2[i] + .5 * p->dt * p->a_3[i]));// * _1_6;
-                }
-                grape_phi[k]   = p->phi_stars;
-                grape_index[k] = p - parts;
-                #ifdef PRINT_2
-                if(p - parts == PRINT_1 || p - parts == PRINT_2)
-                {
-                    printf("### GRAPE CALC m%d:\tt  %e-%1.2e\tx0  %e\t%e\t%e\n",
-                        p - parts,
-                        t_total(p->t),
-                        convert_time(p->dt, 0),
-                        convert_length(p->x[0], 0),
-                        convert_length(p->x[1], 0),
-                        convert_length(p->x[2], 0));
-                }
-                #endif
-            }
-        }
-
-        reducecount = 0;
-
-        CALC_NEIGHBOUR_SPHERES:
-        for(k = 0; k < grape_npipes; k++)
-        {
-            _print_position(ul_kill, " GRAPE_GETFORCES-F2-1", j, movecount, k, .0);
-            if(k + j >= movecount)
-                grape_h2[k] = grape_h2[k-1];
-            else
-            {
-                p = parts + active[k + j];
-                x = v_abs(p->x);
-                // set vicinity sphere for neighbour detection
-                grape_h2[k] = 1.03 * (_sqrt_mratio * x + (v_abs(p->v) + sqrt(2. * parts[0].m / x)) * p->dtnext);
-                grape_h2[k] *= grape_h2[k];
-            }
-
-        }
-
-        resent = 0;
-        GRAPE_RESEND:
-        _print_position(ul_kill, " GRAPE_GETFORCES-F2-3", j, movecount, grape_npipes, .0);
-        _global_function = _G6_CALC_FIRSTHALF;
-        g6calc_firsthalf(C_GRAPE_CLUSID,
-               pcount - 1,
-               j + grape_npipes < movecount ? grape_npipes : movecount - j,
-               grape_index,
-               grape_x,
-               grape_v,
-               grape_f,
-               grape_f_6,
-               grape_phi,
-               .0,
-               grape_h2);
-        _global_function = _UL_HERMITE2_GRAPE_GETFORCES;
-        _print_position(ul_kill, " GRAPE_GETFORCES-F2-4", j, movecount, grape_npipes, .0);
-
-        // analyse previous neighbours ?
-
-        _global_function = _G6_CALC_LASTHALF;
-        k = g6calc_lasthalf2(C_GRAPE_CLUSID,
-               pcount - 1,
-               j + grape_npipes < movecount ? grape_npipes : movecount - j,
-               grape_index,
-               grape_x,
-               grape_v,
-               .0,
-               grape_h2,
-               grape_f,
-               grape_f_6,
-               grape_phi,
-               nnb);
-        _global_function = _UL_HERMITE2_GRAPE_GETFORCES;
-        _print_position(ul_kill, " GRAPE_GETFORCES-F2-5", j, movecount, grape_npipes, .0);
-
-        if(k)
-        {
-            if(k < 0)
-                fprintf(get_file(FILE_WARNING), "### [%1.10e]\tGRAPE ERROR lasthalf=%d - %s%d.\n",
-                    t_total(time), k,
-                    (resent <= MAX_GRAPE_RESEND) ? "RESEND BLOCK, TRY #" : "IGNORE AFTER TRY #",
-                    resent);
-            else
-                fprintf(
-                    get_file(FILE_WARNING),
-                    "### [%1.10e] LASTHALF PROBLEM FOR BLOCK %d : %d - %s%d.\n",
-                    t_total(time), grape_index[0], k,
-                    (resent <= MAX_GRAPE_RESEND) ? "RESEND BLOCK, TRY #" : "IGNORE AFTER TRY #",
-                    resent);
-            fflush(get_file(FILE_WARNING));
-            if(resent++ <= MAX_GRAPE_RESEND)
-                goto GRAPE_RESEND;
-        }
-
-        _print_position(ul_kill, " GRAPE_GETFORCES-F3-1", j, movecount, grape_npipes, .0);
-        _global_function = _G6_READ_NEIGHBOUR_LIST;
-        k = g6_read_neighbour_list(C_GRAPE_CLUSID);
-        _global_function = _UL_HERMITE2_GRAPE_GETFORCES;
-        _print_position(ul_kill, " GRAPE_GETFORCES-F3-2", j, movecount, grape_npipes, .0);
-
-        if(k)
-        {
-            if(reducecount++ > MAX_REDUCECOUNT)
-            {
-                fprintf(get_file(FILE_WARNING),
-                    "### [%e]\tERROR retrieving neighbour list from GRAPE: %d - abort after %d retries.\n",
-                    t_total(time), k, reducecount - 1 );
-                fflush(get_file(FILE_WARNING));
-            }
-            else
-            {
-                fflush(get_file(FILE_WARNING));
-                for(k = 0; k < grape_npipes && k + j < movecount; k++)
-                {
-                    _print_position(ul_kill, " GRAPE_GETFORCES-F4-1", j, grape_npipes, k, .0);
-                    parts[active[k + j]].dtnext *= .5;
-                }
-                goto CALC_NEIGHBOUR_SPHERES;
-            }
-        }
-
-        for(k = 0; k < grape_npipes && j + k < movecount; k++)
-        {
-            _print_position(ul_kill, " GRAPE_GETFORCES-F5-1", j, grape_npipes, k, .0);
-            p = parts + active[k + j];
-            struct particle *p2 = parts + nnb[k];
-            p->nearestneighbour = nnb[k];
-            if(p2->active && v_dist(p->xp, p2->xp, 2) <  9. * C_2G_C2 * C_2G_C2 * (p2->m + p->m) * (p2->m + p->m))
-            {
-                fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of m%d and m%d: %e (r_S = %e) ####\n",
-                        t_total(p->t),
-                        p->name,
-                        p2->name,
-                        convert_length(v_dist(p->xp, p2->xp, 1), 0),
-                        convert_length(C_2G_C2 * (p2->m + p->m), 0));
-                fflush(get_file(FILE_WARNING));
-                add_close(parts, p, p2);
-            }
-            _print_position(ul_kill, " GRAPE_GETFORCES-F5-2", j, grape_npipes, k, .0);
-
-            for(i = 0; i < 3; i++)
-            {
-                //p->xp[i]  = p->x[i] = grape_x[k][i];
-                //p->vp[i]  = p->v[i] = grape_v[k][i];
-                p->an[i]    = grape_f[k][i];
-                p->a_n[i]   = grape_f_6[k][i]; // actually is jerk rather than f_6
-                p->phi_stars  = grape_phi[k];
-            }
-
-            p->phi_bgr = .0;
-            add_force_extpot(grape_x[k], grape_v[k], p->an, p->a_n, &(p->phi_bgr));
-
-            #if P_IMBH > 0
-            _print_position(ul_kill, " GRAPE_GETFORCES-F5-3", j, grape_npipes, k, .0);
-            if(p->name != P_IMBH && parts[P_IMBH].name == P_IMBH)
-                add_close(parts, p, parts + P_IMBH); // IMBH position should not move (P_IMBH==1).
-            #endif
-            if(reducecount > MAX_REDUCECOUNT)
-                continue;
-            _print_position(ul_kill, " GRAPE_GETFORCES-F5-4", j, grape_npipes, k, .0);
-            _global_function = _G6_GET_NEIGHBOUR_LIST;
-
-            assert(!g6_get_neighbour_list(C_GRAPE_CLUSID, k, pcount-2, &nblen, nb));
-            _global_function = _UL_HERMITE2_GRAPE_GETFORCES;
-
-            _print_position(ul_kill, " GRAPE_GETFORCES-F5-5", j, grape_npipes, k, .0);
-
-            #ifdef GRAPE_CHECK_NEIGHBOURS
-            if(nblen < 1 || (nblen == 1 && nb[0] < 1))
-            // no neighbours found ?! ?!
-            {
-                p2 = parts + nnb[k];
-                if(!unpredicted)
-                {
-                    for(i = 0; i < 3; i++)
-                        temp[i] = p->x[i] - p2->xp[i];
-                }
-                else
-                {
-                    dt = time - p2->t;
-                    dt2 = .5 * dt * dt; dt3 = dt * dt2 * _1_3; dt4 = .25 * dt * dt3;
-                    for(i = 0; i < DIMENSIONS; i++)
-                      temp[i] = p2->x[i]  + dt * p2->v[i] + dt2 * (p2->a[i] + p2->ha[i])
-                        + dt3 * (p2->a_[i] + p2->ha_[i]) + dt4 * (p2->a_2[i] + p2->ha_2[i]) -p->x[i];
-                }
-                if(scal_prod(temp, temp) < .99 * grape_h2[k])
-                {
-                    resent++;
-                    fprintf(
-                        get_file(FILE_WARNING),
-                        "### [%1.10e] NO NEIGHBOURS RETURNED FOR m%d (%d:%e<%e) - %s%d.\n",
-                        t_total(time), p->name,
-                        nnb[k],
-                        convert_length(sqrt(scal_prod(temp, temp)), 0),
-                        convert_length(sqrt(grape_h2[k]), 0),
-                        (resent <= MAX_GRAPE_RESEND) ? "RESEND BLOCK, TRY #" : "IGNORE AFTER TRY #",
-                        resent);
-                    fflush(get_file(FILE_WARNING));
-                    if(resent <= MAX_GRAPE_RESEND)
-                        goto GRAPE_RESEND;
-                }
-            }
-            #endif //GRAPE_CHECK_NEIGHBOURS
-
-            for(i = 0; i < nblen; i++)
-            {
-                _print_position(ul_kill, " GRAPE_GETFORCES-F6-1", j, i, nblen, .0);
-                if(nb[i] > 0 || nb[i] < pcount)
-                    add_close(parts, p, parts + nb[i]);
-                _print_position(ul_kill, " GRAPE_GETFORCES-F6-2", j, i, nblen, .0);
-            }
-            _print_position(ul_kill, " GRAPE_GETFORCES-F6-3", j, i, nblen, .0);
-        }
-        _print_position(ul_kill, " GRAPE_GETFORCES-F6-4", j, i, nblen, .0);
-    }
-
-    _print_position(ul_kill, " GRAPE_GETFORCES-F6-5", j, i, nblen, .0);
-
-    _exit_function();
-}
-#endif
-// END
-// grape_getforces
 
 
 void iteration( struct particle parts[],
@@ -1617,22 +1195,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         node_posmax = *pcount - 1;
     }
 
-    #ifdef USE_GRAPE
-    if(time(NULL) - t_last_grapefree > T_GRAPEFREE_INTERVAL || grape_npipes < 0 || ul_kill == SIGNAL_FREE_GRAPE)
-    {
-        if(grape_npipes >= 0)
-            g6_close(C_GRAPE_CLUSID);
-        if(ul_kill == SIGNAL_FREE_GRAPE)
-        {
-            ul_kill = 0;
-            fprintf(get_file(FILE_WARNING), "#### Falling asleep after freeing grape... ####\n"); fflush(get_file(FILE_WARNING));
-            raise(SIGSTOP);
-            fprintf(get_file(FILE_WARNING), "#### ...woken up again - trying to get GRAPE. ####\n"); fflush(get_file(FILE_WARNING));
-        }
-        grape_init(parts, *pcount);
-    }
-    #endif
-
     // find particles to move
     init_dt(parts, *pcount, 0);
 
@@ -1649,7 +1211,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
 
     T_START;
 
-    #ifndef USE_GRAPE
     for(j = 0; j < movecount; j++)
     {
         p = parts + active[j];
@@ -1678,10 +1239,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         evaluate_1_2(parts, *pcount, active[j],node_posmin, node_posmax, forceterm[j].a, forceterm[j].a_);
 
     sumforce(parts);
-
-    #else // USE_GRAPE
-        grape_getforces(parts, *pcount, tmin);
-    #endif // USE_GRAPE
 
     hermite_correct(parts, *pcount);
 
@@ -1748,19 +1305,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         p = parts + active[j];
         p->active = 0;
 
-        #ifdef USE_SSE
-        if(p->sse_on && t_total(p->t) > (p->sse_tphys + p->sse_dtm) * 1.e6)
-        {
-            p->sse_dtm = t_total(p->t) * 1.e-6 - p->sse_tphys;
-            //double mt_old = p->sse_mt;
-            evolv1(&(p->sse_kw), &(p->sse_mass), &(p->sse_mt), &(p->sse_epoch), &(p->sse_tphys), &(p->sse_dtm), &(p->sse_z), &(p->sse_r));
-            double new_mass = convert_mass(p->sse_mt, 1) * ((double) p->sse_multiple);
-            lose_energy((p->m - new_mass) * (.5 * scal_prod(p->v, p->v) + p->phi_stars + p->phi_bgr - parts[0].m / sqrt(scal_prod(p->x, p->x))));
-            p->m = new_mass;
-            p->sse_dtm *= .1;
-        }
-        #endif
-
         if(p->name == P_IMBH)
         {
             static double xv_imbh = 1.;
@@ -1785,46 +1329,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         }
 
         double x = v_abs(p->x);
-        #ifdef USE_GRAPE
-        grape_send_particle(p, p - parts);
-
-        // approaching SMBH??
-        if(x < 3. * C_2G_C2 * (p->m + parts->m))
-        {
-            // collision in 3 Schwarzschild-radii
-            fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of SMBH m0 and m%d: %e (r_S = %e) ####\n",
-                t_total(p->t),
-                p->name,
-                convert_length(x, 0),
-                convert_length(C_2G_C2 * (parts->m + p->m), 0));
-                fflush(get_file(FILE_WARNING));
-                add_collision(p, parts);
-        }
-
-        en = p->m * (.5 * (scal_prod(p->v, p->v) + p->phi_stars) + p->phi_bgr - parts[0].m / x);
-
-        #ifdef WARN_ENERGYALL
-        if(fabs(en - p->energy) > WARN_ENERGY_FACT * fabs(p->energy))
-            fprintf(get_file(FILE_DEBUG),
-                "#### [t=%1.12e,%1.4e] particle m%d gained %1.2f%% energy from %e to %e, at [%e\t%e\t%e\t%e\t%e\t%e\t]\tx=%1.2e\tv=%1.2e\ta=%1.2e\ta_=%1.2e\tha=%1.2e\tha_=%1.2e\t nearest: m%d (r=%e) ####\n",
-                t_total(tmin), convert_time(p->dt, 0),
-                p->name,
-                100.*(en/p->energy-1.),
-                p->energy, en,
-                convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
-                convert_length(convert_time(p->v[0], 1), 0),
-                convert_length(convert_time(p->v[1], 1), 0),
-                convert_length(convert_time(p->v[2], 1), 0),
-                v_abs(p->x), v_abs(p->v), v_abs(p->a), v_abs(p->a_), v_abs(p->ha), v_abs(p->ha_),
-                p->nearestneighbour,
-                (p->nearestneighbour > 0 && p->nearestneighbour < *pcount && p != parts + p->nearestneighbour)
-                    ? convert_length(v_dist(p->x, parts[p->nearestneighbour].x, 1), 0)
-                    : .0
-                );
-            fflush(get_file(FILE_DEBUG));
-        #endif
-        p->energy = en;
-        #endif
 
         if(p->nearestneighbour > 0 && p->nearestneighbour < *pcount && p != parts + p->nearestneighbour)
         {
@@ -1834,24 +1338,12 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                 // m1*v1_^2/2 + m2*v2_^2/2 = .5 * m1*m2 / (m1 + m2) * |v1-v2|^2 !< m1*m2 / |r1-r2|
                 // (.5 * v_dist(p->v, pk->v, 2) * v_dist(p->x, pk->x, 1) < p->m + pk->m
                 //(0
-                #ifdef USE_SSE
-                #ifdef SSE_R_COLL
-                || (p->sse_r > .0 && pk->sse_r > .0 && convert_length(v_dist(p->x, pk->x, 1), 0) * 206265. < (p->sse_r + pk->sse_r) * 4.7e-3)
-                #endif
-                #endif
             ))
             {
                 add_collision(p, pk);
                 fprintf(get_file(FILE_WARNING),
-                    #ifdef USE_SSE
-                    "#### [t=%1.12e] particles m%d and m%d formed a binary - merge (r1=%e\tr2=%e\tr=%e\tE_kin=%e\tE_pot=%e)!\n",
-                    #else
                     "#### [t=%1.12e] particles m%d and m%d formed a binary - merge (r=%e\tE_kin=%e\tE_pot=%e)!\n",
-                    #endif
                     t_total(tmin), p->name, pk->name,
-                    #ifdef USE_SSE
-                    p->sse_r, pk->sse_r,
-                    #endif
                     convert_length(v_dist(p->x, pk->x, 1), 0) * 206265. / 4.7e-3,
                     .5 * (p->m * scal_prod(p->v, p->v) + (pk->m * scal_prod(pk->v, pk->v))),
                     //.5 * p->m * pk->m / (p->m + pk->m) * v_dist(p->v, pk->v, 2),
@@ -1882,9 +1374,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                 pk = coll_vector[i][1];
                 if(pk != parts)
                 {
-                    #ifdef USE_GRAPE
-                    predict_part_hermite2(pk, tmin);
-                    #endif
                     fprintf(get_file(FILE_WARNING),
                         "# MERGE: m1 = %e\tr1 = %e\tm2 = %e\tr2 = %e\tr = %e pc = %e Rsun\tv = %e pc/Myr\n",
                         convert_mass(p->m,  0), p->sse_r, convert_mass(pk->m, 0), pk->sse_r, convert_length(v_dist(p->x, pk->xp, 1), 0),
@@ -1911,7 +1400,7 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                     pk->sse_mt += p->sse_mt / ((double) p->sse_multiple);
 
                     pk->energy += pk->m * (.5 * (scal_prod(pk->v, pk->v) + pk->phi_stars) + p->phi_bgr - parts[0].m / v_abs(pk->x));
-                    // only valid if pk->phi is up to date (i.e. pk is active and USE_GRAPE ?)
+                    // only valid if pk->phi is up to date
                     p->energy -= .5 * pk->m * scal_prod(pk->v, pk->v);
                 }
                 else // COLLISION with SMBH
@@ -1977,13 +1466,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                     t_total(tmin), movecount);
             fflush(get_file(FILE_WARNING));
 
-            #ifdef USE_GRAPE
-            fprintf(get_file(FILE_WARNING),
-                "#### [t=%1.12e] Re-initialize GRAPE.\n",
-                t_total(tmin));
-            g6_close(C_GRAPE_CLUSID);
-            grape_init(parts, *pcount);
-            #endif
             init_dt(parts, *pcount, 1);
             fprintf(get_file(FILE_WARNING), "### NEW NUMBER OF PARTICLES: %d\n", *pcount);
             fflush(get_file(FILE_WARNING));

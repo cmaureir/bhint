@@ -102,9 +102,7 @@ double get_energy(struct particle parts[], int pcount, int pos)
     double phi=.0;
     add_force_extpot(p->x, NULL, NULL, NULL, &phi);
     e += p->m * phi;
-    //printf("%d\t%e\n", pos, e);
     #endif // EXT_POT
-
 
     _exit_function();
 
@@ -157,7 +155,6 @@ void get_acc(struct particle parts[], int pcount, int pos, double acc[3])
             acc[i] -= p2->m / dist3 * (p->x[i] - p2->x[i]);
         }
     }
-
     _exit_function();
 }
 
@@ -170,13 +167,6 @@ double get_epot(struct particle parts[], int pcount, int pred)
     double e_pot = 0.0;
     struct particle *p1;
 
-    #ifdef USE_GRAPE
-    for(p1 = parts + 1; p1 < parts + pcount; p1++)
-    {
-        e_pot += p1->m * (p1->phi_stars * .5 - parts[0].m / v_abs(p1->x));
-    }
-
-    #else
     struct particle *p2;
     for(p1 = parts; p1 < parts + pcount - 1; p1++)
     {
@@ -187,7 +177,6 @@ double get_epot(struct particle parts[], int pcount, int pred)
                      : sqrt(v_dist(p1->x,  p2->x,  2) + (p1 > parts ? softening_par2 : 0)));
         }
     }
-    #endif // USE_GRAPE
 
     #ifdef EXT_POT
     for(p1 = parts + 1; p1 < parts + pcount; p1++)
@@ -288,7 +277,6 @@ void predict(struct particle parts[], int pcount, double t)
     {
         predict_part_hermite2(p, t);
     }
-
     _exit_function();
 }
 
@@ -419,12 +407,6 @@ void integrate( struct particle parts[], int pcount,
                 #endif
                 )
                  _m_max = p->m;
-
-        #ifdef USE_SSE
-        for(p = parts; p < parts + pcount; p++)
-            if(N_MAX_DETAIL >= -1 && p->name > N_MAX_DETAIL)
-                p->sse_on = 0;
-        #endif
 
         if(print_dump_only)
         {
@@ -575,10 +557,6 @@ void integrate( struct particle parts[], int pcount,
                         p->t -= t_maxval;
                         p->io_tlast -= t_maxval;
                         p->htlast -= t_maxval;
-                        #ifdef USE_GRAPE
-                        if((method == 'i') && (p > parts))
-                            grape_send_particle(p, p - parts);
-                        #endif
                     }
                     t_over += t_maxval;
                     fprintf(get_file(FILE_WARNING),"### [%1.12e] reset time by %e (%e system units) ###\n",
@@ -616,10 +594,6 @@ void integrate( struct particle parts[], int pcount,
             _help[0], _help[1]);
 
     output_stepsize();
-    #ifdef USE_GRAPE
-    if(method == 'i')
-        g6_close(C_GRAPE_CLUSID);
-    #endif
     _exit_function();
 }
 
@@ -653,13 +627,9 @@ void sigproc(int signal)
                 #endif
         fflush(get_file(FILE_WARNING));
 
-        #ifdef USE_GRAPE
-        ul_kill = SIGNAL_FREE_GRAPE;
-        #else
         fprintf(get_file(FILE_WARNING), "#### Falling asleep... ####\n"); fflush(get_file(FILE_WARNING));
         raise(SIGSTOP);
         fprintf(get_file(FILE_WARNING), "#### ...woken up again. ####\n"); fflush(get_file(FILE_WARNING));
-        #endif
 
         break;
 
@@ -722,10 +692,6 @@ int main(int argc, char **argv)
     }
     t_maxval *= .5;
 
-    #ifdef USE_GRAPE
-    t_ = convert_time(2.*C_GRAPE_MAX_T_2, 1);
-    while(t_ < t_maxval) t_maxval *= .5;
-    #endif
 
     if(argc > 1) method = argv[1][0];
     switch(method)
@@ -794,16 +760,8 @@ int main(int argc, char **argv)
         fprintf(get_file(FILE_OUTPUT), "# ETA=%e\tMIN_EVALS=%d\n",ETA, MIN_EVALS);
         fprintf(get_file(FILE_OUTPUT), "# DT_TOLERANCE=%e\tT_MAX=%e\tP_IMBH=%d\tGRAPE=%d\tSSE=%d\tEXT_POT=%d\n",
                 DT_TOLERANCE, t_maxval, P_IMBH
-                #ifdef USE_GRAPE
-                , 1
-                #else
                 , 0
-                #endif
-                #ifdef USE_SSE
-                , 1
-                #else
                 , 0
-                #endif
                 #ifdef EXT_POT
                 , 1
                 #else

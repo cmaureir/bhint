@@ -52,11 +52,7 @@ int check_fast_approaches(  struct particle *parts,
     else
     // have to use predicted x, v and corrected derivatives
     {
-        #ifndef USE_GRAPE
         pkx = pk->xp;
-        #else
-        pkx = pk->x;
-        #endif
         pkv = pk->v;
         dt = p->t - pk->t;
         dt2 = .5 * dt * dt; dt3 = dt * dt2 * _1_3; dt4 = .25 * dt * dt3; dt5 = .2 * dt * dt4;
@@ -64,11 +60,7 @@ int check_fast_approaches(  struct particle *parts,
 
   for(i = 0; i < 3; i++)
   {
-      if( 1
-          #ifdef USE_GRAPE
-          && pk->active
-          #endif
-      )
+      if(1)
       {
           x[i]  = px[i] - pkx[i];
       }
@@ -79,9 +71,7 @@ int check_fast_approaches(  struct particle *parts,
                   + dt2 * (pk->a[i] + pk->ha[i])
                   + dt3 * (pk->a_[i] + pk->ha_[i])
                   + dt4 * (pk->a_2[i] + pk->ha_2[i])
-                  #ifndef USE_GRAPE
                   + dt5 * (pk->a_3[i] + pk->ha_3[i])
-                  #endif
           );
       }
 
@@ -98,22 +88,16 @@ int check_fast_approaches(  struct particle *parts,
                   + dt * (pk->a[i] + pk->ha[i])
                   + dt2 * (pk->a_[i] + pk->ha_[i])
                   + dt3 * (pk->a_2[i] + pk->ha_2[i])
-                  #ifndef USE_GRAPE
                   + dt4 * (pk->a_3[i] + pk->ha_3[i])
-                  #endif
                   );
           a[i]  = p->ha[i]  + p->a[i]  - (pk->a[i] + pk->ha[i]
                   + dt * (pk->a_[i] + pk->ha_[i])
                   + dt2 * (pk->a_2[i] + pk->ha_2[i])
-                  #ifndef USE_GRAPE
                   + dt3 * (pk->a_3[i] + pk->ha_3[i])
-                  #endif
                   );
           a_[i] = p->ha_[i] + p->a_[i] - (pk->a_[i] + pk->ha_[i]
                   + dt * (pk->a_2[i] + pk->ha_2[i])
-                  #ifndef USE_GRAPE
                   + dt2* (pk->a_3[i] + pk->ha_3[i])
-                  #endif
                   );
       }
     }

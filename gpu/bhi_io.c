@@ -250,7 +250,6 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[j].x, (*parts)[j].x + 1, (*parts)[j].x + 2,
                     (*parts)[j].v, (*parts)[j].v + 1, (*parts)[j].v + 2);
 
-                    //#ifdef USE_SSE
                     if((*parts)[j].m < 0)
                     {
                         (*parts)[j].m = -(*parts)[j].m;
@@ -335,18 +334,6 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                 (*parts)[j].io_steps_p = 0;
                 (*parts)[j].is_elliptical = 1;
                 (*parts)[j].io_close_warn = -1.;
-
-                #ifdef USE_SSE
-                (*parts)[j].sse_mass  = (*parts)[j].m * _conv_m / ((double) (*parts)[j].sse_multiple);
-                (*parts)[j].sse_on    = (j > 0 && (*parts)[j].sse_mass <= MAX_SSE_MASS && (N_MAX_SSE < -1 || (*parts)[j].name <= N_MAX_SSE)) ? 1 : 0;
-                (*parts)[j].sse_kw    = 1;
-                (*parts)[j].sse_mt    = (*parts)[j].sse_mass;
-                (*parts)[j].sse_epoch = .0;
-                (*parts)[j].sse_tphys = .0;
-                (*parts)[j].sse_z     = SSE_Z;
-                (*parts)[j].sse_dtm   = 1.e-3;   // initial SSE timestep [Myr]
-                (*parts)[j].sse_kw    = 1;
-                #endif
 
                 if(j > 0)
                 {
@@ -517,9 +504,7 @@ int output( int print, struct particle parts[], int pcount,
         //e = get_epot(parts, pcount, 1) + get_ekin(parts, pcount, 1);
         for(p = parts + 1; p < parts + pcount; p++)
         {
-            #ifndef USE_GRAPE
             p->energy = get_energy(parts, pcount, p - parts);
-            #endif
             e += p->energy;
         }
 
