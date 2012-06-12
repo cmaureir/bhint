@@ -416,7 +416,7 @@ void integrate( struct particle parts[], int pcount,
                         convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
                         convert_length(convert_time(p->v[0], 1), 0), convert_length(convert_time(p->v[1], 1), 0), convert_length(convert_time(p->v[2], 1), 0),
                         convert_length(v_abs(p->x), 0), convert_length(p->curr_a, 0), 1 - p->curr_e, convert_length(p->rmin, 0), convert_length(p->rmax, 0),
-                        convert_length(p->r_apo, 0), convert_length(p->r_peri, 0), p->energy, p->energy + p->m * (.5 * p->phi_stars), p->sse_multiple
+                        convert_length(p->r_apo, 0), convert_length(p->r_peri, 0), p->energy, p->energy + p->m * (.5 * p->phi_stars), 1
                         );
             return;
         }

@@ -142,10 +142,6 @@ struct particle {
 
   double gr_a_2[3], gr_a_3[3], v_thresh_2;
   int switch_pn;
-
-  int sse_on, sse_kw;
-  double sse_mass, sse_mt, sse_epoch, sse_tphys, sse_z, sse_dtm, sse_r;
-  int sse_multiple;
 };
 
 /*

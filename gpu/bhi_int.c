@@ -1376,7 +1376,7 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                 {
                     fprintf(get_file(FILE_WARNING),
                         "# MERGE: m1 = %e\tr1 = %e\tm2 = %e\tr2 = %e\tr = %e pc = %e Rsun\tv = %e pc/Myr\n",
-                        convert_mass(p->m,  0), p->sse_r, convert_mass(pk->m, 0), pk->sse_r, convert_length(v_dist(p->x, pk->xp, 1), 0),
+                        convert_mass(p->m,  0), .0, convert_mass(pk->m, 0), .0, convert_length(v_dist(p->x, pk->xp, 1), 0),
                         convert_length(v_dist(p->x, pk->xp, 1), 0) * 206265. / 4.7e-3, convert_length(convert_time(v_dist(p->v, pk->vp, 1), 1), 0) * 1.e6
                         );
                     p->energy = .5 * (p->m * scal_prod(p->v, p->v) + pk->m * (scal_prod(pk->vp, pk->vp)))
@@ -1394,10 +1394,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                       pk->dt = p->dt;
                     pk->htlast = pk->t = tmin;
                     pk->m += p->m;
-
-                    // stellar collision
-                    pk->sse_mass += p->sse_mass / ((double) p->sse_multiple);
-                    pk->sse_mt += p->sse_mt / ((double) p->sse_multiple);
 
                     pk->energy += pk->m * (.5 * (scal_prod(pk->v, pk->v) + pk->phi_stars) + p->phi_bgr - parts[0].m / v_abs(pk->x));
                     // only valid if pk->phi is up to date

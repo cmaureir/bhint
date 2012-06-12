@@ -253,13 +253,8 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     if((*parts)[j].m < 0)
                     {
                         (*parts)[j].m = -(*parts)[j].m;
-                        (*parts)[j].sse_multiple = 2;
                     }
 
-                    else
-                    {
-                        (*parts)[j].sse_multiple = 1;
-                    }
                     //#endif
                     (*parts)[j].m /= _conv_m;
                     (*parts)[j].x[0] /= _conv_x;
@@ -595,7 +590,7 @@ int output( int print, struct particle parts[], int pcount,
                         #endif
                         , p->energy
                         , p->energy + p->m * (.5 * p->phi_stars /*+ p->phi_bgr*/)
-                        , p->sse_multiple
+                        , 1
                         );
 
                 p->rmin = 1.e99;
