@@ -6,11 +6,7 @@
 #include <omp.h>
 #include "bhi_config.h"
 
-#ifdef  USE_M_ENCL
-#define M_ENCL_IO(r) M_ENCL(r)
-#else
 #define M_ENCL_IO(r) .0
-#endif
 
 #define min(x, y) ((x) <= (y) ? (x) : (y))
 

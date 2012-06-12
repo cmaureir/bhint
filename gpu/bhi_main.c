@@ -98,12 +98,6 @@ double get_energy(struct particle parts[], int pcount, int pos)
         }
     }
 
-    #ifdef EXT_POT
-    double phi=.0;
-    add_force_extpot(p->x, NULL, NULL, NULL, &phi);
-    e += p->m * phi;
-    #endif // EXT_POT
-
     _exit_function();
 
     return e;
@@ -177,15 +171,6 @@ double get_epot(struct particle parts[], int pcount, int pred)
                      : sqrt(v_dist(p1->x,  p2->x,  2) + (p1 > parts ? softening_par2 : 0)));
         }
     }
-
-    #ifdef EXT_POT
-    for(p1 = parts + 1; p1 < parts + pcount; p1++)
-    {
-        double phi=.0;
-        add_force_extpot(pred ? p1->xp : p1->x, NULL, NULL, NULL, &phi);
-        e_pot += p1->m * phi;
-    }
-    #endif // EXT_POT
 
     _exit_function();
 
@@ -762,19 +747,10 @@ int main(int argc, char **argv)
                 DT_TOLERANCE, t_maxval, P_IMBH
                 , 0
                 , 0
-                #ifdef EXT_POT
-                , 1
-                #else
                 , 0
-                #endif
         );
 
-        #ifdef EXT_POT
-        fprintf(get_file(FILE_OUTPUT), "# EXTERNAL POTENTIAL: RHO0=%e\tGAMMA1=%e\tGAMMA2=%e\tRMIN=%e\tR0=%e\tRMAX=%e\n",
-                EP_RHO0, EP_GAMMA1, EP_GAMMA2, EP_RMIN, EP_R0, EP_RMAX);
-        #else
         fprintf(get_file(FILE_OUTPUT), "# NO EXTERNAL POTENTIAL\n");
-        #endif
         #ifdef N_MAX_DETAIL
         fprintf(get_file(FILE_OUTPUT), "# N_MAX_DETAIL=%d\n", N_MAX_DETAIL);
         #endif

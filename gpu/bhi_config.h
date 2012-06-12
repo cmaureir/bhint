@@ -9,21 +9,6 @@
 #define ETA           0.1          // precision parameter: \eta from Aarseth (1985)
 
 
-/*          ******* EXTERNAL POTENTIAL *******          */
-//#define EXT_POT                    // Use external spherical potential defined below for integration.
-                                   // Requires density, enclosed mass, and potential at radius r
-                                   // (EP_RHO(r), EP_M(r), EP_PHI(r), all in internal units)
-                                   // Use of USE_M_ENCL recommended.
-                                   // ********** CONFIGURE BELOW **********
-
-
-/*          ********* MASS PROFILE ***********          */
-//#define USE_M_ENCL                 // Use mass profile defined below (e.g., for stellar cusp or external potential)
-                                   // to calculate orbital parameters.
-                                   // (for creating models and output only; does not affect simulation)
-                                   // ********** CONFIGURE BELOW **********
-
-
 /*          ******* USE PN TREATMENT *********          */
 //#define PN                         // Use post-Newtonian treatment
                                    // ********** CONFIGURE BELOW **********
@@ -54,76 +39,6 @@
                                    // for model creation only
 
 
-/******************************************************************************/
-
-#ifdef EXT_POT
-
-/******************************************************************************
- *
- * Defines external spherical potential for integration.
- * Requires density, enclosed mass, and potential at radius r (EP_RHO(r), EP_M(r), EP_PHI(r), all in internal units).
- * For convenience, we provide properties for a broken power-law density profile in external units:
- *   rho(r) = EP_RHO0 * (r / EP_R0)^EP_GAMMA1  ,  r <= EP_R0
- *   rho(r) = EP_RHO0 * (r / EP_R0)^EP_GAMMA2  ,  r >= EP_R0
- * restricted to EP_RMIN <= r <= EP_RMAX.
- *
- * Following parameters represent the findings of Schoedel et al. (A&A 469, 125 (2007), Eq. 7),
- * the external potential only includes the region outside EP_RMIN=0.22 pc
- * (assuming the model includes the stars inside 0.22 pc, see also below).
- *
- ******************************************************************************/
-
-#define EP_RHO0   2.8e6            // density at break radius in external units [M_sun pc^-3]
-#define EP_RMIN   .22              // inner radius of external profile in external units [pc]
-#define EP_R0     .22              // break radius in external units [pc]
-#define EP_RMAX   10.              // outer radius of external profile in external units [pc]; requires EP_RMAX >= EP_RMIN
-#define EP_GAMMA1 -1.2             // power-law exponent inside break radius
-#define EP_GAMMA2 -1.75            // power-law exponent outside break radius
-
-#define EP_MIN(a, b)             (a < b ? a : b)
-#define EP_MAX(a, b)             (a > b ? a : b)
-#define EP_MIN3(a, b, c)         EP_MIN(EP_MIN(a, b), c)
-#define EP_MAX3(a, b, c)         EP_MAX(EP_MAX(a, b), c)
-
-                                   // density in external units
-#define EP_RHO_PHYS(r)           ((r < EP_RMIN || r > EP_RMAX) ? .0 : EP_RHO0 * pow(r/EP_R0, r < EP_R0 ? EP_GAMMA1 : EP_GAMMA2))
-
-
-                                    // mass integral contribution of interval r1..r2, power-law exponent g
-#define EP_M_INT(r1, r2, g)      (4.*M_PI*EP_RHO0*pow(EP_R0, -g)/(3.+g) * (pow(r2, 3. + g) - pow(r1, 3. + g)))
-
-                                  // potential integral contribution of interval a..b, with r>=b, power-law exponent g
-#define EP_PHI_INT1(r, g, a, b)  (EP_RHO0 / ((3. + g) * r * pow(EP_R0, g)) * (pow(b, 3. + g) - pow(a, 3. + g)))
-                                   // potential integral contribution of interval a..b, with r<=a, power-law exponent g
-#define EP_PHI_INT2(g, a, b)     (EP_RHO0 / ((2. + g)     * pow(EP_R0, g)) * (pow(b, 2. + g) - pow(a, 2. + g)))
-
-                                   // enclosed mass at r in external units
-                                   // first interval:  r_min           ... max(r_min, min(r_0, r, r_max))
-                                   // second interval: max(r_0, r_min) ... max(r_min, r_0, min(r, r_max))
-
-#define EP_M_PHYS(r)             (EP_M_INT(EP_RMIN,                EP_MAX (EP_RMIN, EP_MIN3(EP_R0, r, EP_RMAX)), EP_GAMMA1) + \
-				  EP_M_INT(EP_MAX(EP_R0, EP_RMIN), EP_MAX3(EP_RMIN, EP_R0, EP_MIN (r, EP_RMAX)), EP_GAMMA2))
-
-                                   // potential at r in external units
-                                   // first interval inside r:   r_min              ... max(r_min, min(r, r_0, r_max))
-                                   // first interval outside r:  max(r_min, r)      ... max(r_min, r, min(r_0, r_max))
-                                   // second interval inside r:  max(r_0, r_min)    ... max(r_0, r_min, min(r, r_max))
-                                   // second interval outside r: max(r_0, r_min, r) ... max(r_0,            r, r_max )
-
-#define EP_PHI_PHYS(r)           (-4. * M_PI *				\
-				  (EP_PHI_INT1(r, EP_GAMMA1, EP_RMIN,                    EP_MAX (EP_RMIN, EP_MIN3(r, EP_R0, EP_RMAX))) + \
-				   EP_PHI_INT2(   EP_GAMMA1, EP_MAX(EP_RMIN, r),         EP_MAX3(EP_RMIN, r, EP_MIN (EP_R0, EP_RMAX))) + \
-				   EP_PHI_INT1(r, EP_GAMMA2, EP_MAX (EP_R0, EP_RMIN),    EP_MAX3(EP_R0, EP_RMIN, EP_MIN (r, EP_RMAX))) + \
-				   EP_PHI_INT2(   EP_GAMMA2, EP_MAX3(EP_R0, EP_RMIN, r), EP_MAX3(EP_R0,                  r, EP_RMAX )) ) )
-
-#define EP_RHO(r)                convert_mass(convert_length(convert_length(convert_length(EP_RHO_PHYS(convert_length(r, 0)), 0), 0), 0), 1)
-#define EP_M(r)                  convert_mass(EP_M_PHYS(convert_length(r, 0)), 1)
-#define EP_PHI(r)                convert_mass(convert_length(EP_PHI_PHYS(convert_length(r, 0)), 0), 1)
-
-/******************************************************************************/
-
-#endif // EXT_POT
-
 /******************************************************************************
  *
  * Defines the density profile of the model (used for optimisation and enclosed mass).
@@ -144,12 +59,7 @@
 				       : 3.e5 * (pow(min(convert_length(r, 0), ME_RMAX) / ME_R0, 3. + ME_GAMMA2) - .3)), 1)
 
 
-#ifdef EXT_POT                     // in case of an external potential, add it to the enclosed mass for orbit calculation
-#define M_ENCL(r)        (EP_M(r) + M_ENCL_(r))
-#else
 #define M_ENCL(r)        M_ENCL_(r)
-
-#endif
 
 /******************************************************************************/
 

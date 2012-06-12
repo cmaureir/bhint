@@ -90,49 +90,6 @@ enum _function {_UL_HERMITE2_REGISTER_DT=0, _UL_HERMITE2_INIT_DT, _UL_HERMITE2_P
                 _G6_GET_NEIGHBOUR_LIST, _UL_HERMITE2_ADD_FORCE_EXTPOT};
 
 //
-// add_force_extpot
-//
-void add_force_extpot(double x[3], double v[3], double a[3], double a_[3], double *phi)
-{
-    #ifdef EXT_POT
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_ADD_FORCE_EXTPOT);
-    double r_2 = scal_prod(x, x);
-    double r = sqrt(r_2);
-
-    // a = - G M / r^3 * r_
-    double afact = -EP_M(r) / (r_2*r);
-    if(a != NULL)
-    {
-        a[0] += afact * x[0];
-        a[1] += afact * x[1];
-        a[2] += afact * x[2];
-    }
-
-    // a_ = G [ -M / r^5 (v_ * r^2 - 3 * r_*v_ r_) - r_*v_ / r^2 * 4 pi rho r_ ]
-    // a_ = -4 pi G rho0 / (3-alpha) * (r^(-alpha) * v_ - alpha * r^(-alpha-2) * r_ * (r_*v_))
-    if(a_ != NULL)
-    {
-        assert(v != NULL);
-        afact /= r_2;
-        double xv = scal_prod(x, v);
-        double xv4pirho_r2 = xv * 4. * M_PI * EP_RHO(r) / r_2;
-        a_[0] += afact * (r_2 * v[0] - x[0] * 3. * xv) - xv4pirho_r2 * x[0];
-        a_[1] += afact * (r_2 * v[1] - x[1] * 3. * xv) - xv4pirho_r2 * x[1];
-        a_[2] += afact * (r_2 * v[2] - x[2] * 3. * xv) - xv4pirho_r2 * x[2];
-        afact *= r_2;
-    }
-
-    // phi = 4 pi G rho0 / (3-alpha) / (2-alpha) * r^(2-alpha)
-    if(phi != NULL)
-        *phi += EP_PHI(r);
-
-    _exit_function();
-    #endif // EXT_POT
-}
-// END
-// add_force_extpot
-
-//
 // register_dt
 //
 void register_dt(int pos, double dt)
@@ -1154,7 +1111,6 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
 
     p->phi_stars = phi;
     p->phi_bgr = .0;
-    add_force_extpot(px, pv, a, a_, &(p->phi_bgr));
 
     if(perturb)
         if(!new_close_warn)

@@ -345,7 +345,6 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[k].phi_stars -= (*parts)[j].m * _1_r;
                 }
 
-                add_force_extpot((*parts)[j].x, NULL, NULL, NULL, &((*parts)[j].phi_bgr));
                 (*parts)[j].energy = (*parts)[j].m * (.5 * (scal_prod((*parts)[j].v, (*parts)[j].v) + (*parts)[j].phi_stars) + (*parts)[j].phi_bgr
                                      - (*parts)[0].m / v_abs((*parts)[j].x));
             }
