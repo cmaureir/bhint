@@ -1,12 +1,11 @@
-# Compiled Object files
-*.slo
-*.lo
+TIME
+*.out
+*.detail
+*.dump
+*.debug
+*.other
+*.warn
 *.o
-
-# Compiled Dynamic libraries
-*.so
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
+bhint
+time.*
+data
