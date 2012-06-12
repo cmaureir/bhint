@@ -1950,7 +1950,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                 for(j = 0; j < movecount; j++)
                     if(active[j] > 0 && active[j] < *pcount)
                     {
-                        printf("step_hermite_2 --- movecount:j = %d\n", j);
                         evaluate_1_2(parts, *pcount, active[j], 0, 0, parts[active[j]].ha, parts[active[j]].ha_);
                         evaluate_1_2(parts, *pcount, active[j], 1, *pcount - 1, parts[active[j]].a, parts[active[j]].a_);
                     }
