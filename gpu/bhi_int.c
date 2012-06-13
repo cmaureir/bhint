@@ -17,32 +17,10 @@
 //#define WARN_ENERGYALL
 #define MAX_REDUCECOUNT 3
 
-#ifdef PN
-#define PN_KEPLER
-#define PN_TRACK_ORDER 3
-double __1_c  = 1/C_C;
-double __1_c2 = 1/(C_C*C_C);
-double __1_c3 = 1/(C_C*C_C*C_C);
-double __1_c4 = 1/(C_C*C_C*C_C*C_C);
-double __1_c5 = 1/(C_C*C_C*C_C*C_C*C_C);
-#define PN1
-#define PN2
-#define PN25
-
-#ifdef PN25
-double _17_3 = 17. / 3.;
-#endif
-
-#ifdef PN_KEPLER
-#define PN_ETA_FACT 1.
-#endif
-
 #define NO_USE_MASS_SUM
 
-#else // NOT PN
 #define SWITCHON_PN  0
 #define SWITCHOFF_PN 1
-#endif // NOT PN
 
 static struct timeval start, finish;
 extern int ul_kill;
@@ -436,140 +414,6 @@ void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
 // END
 // find_move_particles
 
-//
-// gr_force_com
-//
-#ifdef PN
-void gr_force_com(double m2, double m1, double _x[3], double v[3], double a[3])
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GR_FORCE_COM);
-    //double __v2 = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-    double m, nu;
-    int k;
-    #ifdef NO_USE_MASS_SUM
-    m = m2;
-    nu = m1 / m2;
-    #else
-    m = m1 + m2;
-    nu = m1 * m2 / (m * m);
-    #endif
-    double _1_r2 = 1. / (_x[0] * _x[0] + _x[1] * _x[1] + _x[2] * _x[2]);
-    double _1_r  = sqrt(_1_r2), _1_r3 = _1_r * _1_r2;
-    double n[3]  = {_x[0] * _1_r, _x[1] * _1_r, _x[2] * _1_r};
-    double v_2   = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
-    double nv    = n[0] * v[0] + n[1] * v[1] + n[2] * v[2];
-    #ifdef PN1
-    double pn1_a = -v_2  * (1 + 3.*nu) + 1.5 * nv*nv * nu + m * _1_r * (4. + nu + nu);
-    double pn1_b = nv * (4. - nu - nu);
-    #endif
-    #ifdef PN2
-    double nv2 = nv * nv;
-    double pn2_a = -2.*v_2*v_2 + 1.5*v_2*nv2*(3.-4.*nu) - 1.875*nv2*nv2*(1-3.*nu);
-    double pn2_b = .5*v_2*nu*(11.+4.*nu) + 2.*nv2*(1. + nu*(12.+3.*nu));
-    double pn2_c = (8.*v_2 - 1.5*nv2*(3.+nu+nu))*nv;
-    #endif
-    #ifdef PN25
-    double pn25_a = v_2 + 3. * m * _1_r;
-    double pn25_b = 3. * v_2 + _17_3 * m * _1_r;
-    #endif
-    for(k = 0; k < 3; k++)
-    {
-        a[k] = .0;
-        #ifdef PN1
-        a[k] += m * _1_r2 * (n[k] * pn1_a + v[k] * pn1_b) * __1_c2;
-        #endif
-        #ifdef PN2
-        a[k] += m * _1_r2 * (n[k] * (nu * pn2_a + m * _1_r * pn2_b - m * m * _1_r2 * (9. + 21.75 * nu))
-                   + v[k] * (nu * pn2_c - .5 * m * _1_r * nv * (4. + 43.*nu))) * __1_c4;
-        #endif
-        #ifdef PN25
-        a[k] -= 1.6 * m * m * _1_r3 * nu * (v[k] * pn25_a - n[k] * nv * pn25_b) * __1_c5;
-        #endif
-    }
-
-    _exit_function();
-}
-// END
-// gr_force_com
-
-//
-// gr_jerk_com
-//
-void gr_jerk_com(double m2, double m1, double _x[3], double v[3], double an[3], double ha[3], double gr_a[3], double a_[3])
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_GR_JERK_COM);
-    //double __v2 = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-    double m, nu;
-    // double a[3] = {an[0] + ha[0] + gr_a[0], an[1] + ha[1] + gr_a[1], an[2] + ha[2] + gr_a[2]};
-    double a[3] = {ha[0] + gr_a[0], ha[1] + gr_a[1], ha[2] + gr_a[2]};
-    int k;
-
-    #ifdef NO_USE_MASS_SUM
-    m = m2;
-    nu = m1 / m2;
-    #else
-    m = m1 + m2;
-    nu = m1 * m2 / (m * m);
-    #endif
-    double _1_r2 = 1. / (_x[0] * _x[0] + _x[1] * _x[1] + _x[2] * _x[2]);
-    double _1_r  = sqrt(_1_r2), _1_r3 = _1_r * _1_r2;
-    double n[3]  = {_x[0] * _1_r,  _x[1] *  _1_r,  _x[2] * _1_r};
-    double v_2   =  v[0] *  v[0] +  v[1] *  v[1] +  v[2] * v[2];
-    double v_2_  =    2. * (v[0] *  a[0] +  v[1] *  a[1] + v[2] * a[2]);
-    double nv    =  n[0] *  v[0] +  n[1] *  v[1] +  n[2] * v[2];
-    double na    =  n[0] *  a[0] +  n[1] *  a[1] +  n[2] * a[2];
-    double xv    = _x[0] *  v[0] + _x[1] *  v[1] + _x[2] * v[2];
-    double n_[3] = {v[0] *  _1_r -    xv * _x[0] * _1_r3,  v[1] * _1_r - xv * _x[1] * _1_r3, v[2] * _1_r - xv * _x[2] * _1_r3};
-    double n_v   = n_[0] *  v[0] + n_[1] *  v[1] + n_[2] * v[2];
-    double nv_   = na + n_v;
-    #ifdef PN1
-    double pn1_a  = -v_2  * (1 + 3.*nu) + 1.5 * nv *  nv * nu + m * _1_r * (4. + 2.*nu);
-    double pn1_a_ = -v_2_ * (1 + 3.*nu) +  3. * nv * nv_ * nu - m *   xv * _1_r3 * (4. + 2.*nu);
-    double pn1_b  =  nv  * (4. - 2.*nu);
-    double pn1_b_ =  nv_ * (4. - 2.*nu);
-    #endif
-    #ifdef PN2
-    double nv2 = nv * nv;
-    double pn2_a1  = -2. *  v_2 *  v_2 + 1.5*v_2*nv2*(3.-4.*nu) - 1.875*nv2*nv2*(1-3.*nu);
-    double pn2_a1_ = -4. *  v_2 * v_2_ + 1.5*v_2_*nv2*(3.-4.*nu) + 3.*v_2*nv*nv_*(3.-4.*nu) - 7.5*nv2*nv*nv_*(1-3.*nu);
-    double pn2_a2  = .5  *  v_2 *   nu * (11.+4.*nu)  + 2.*nv2*(1. + nu*(12.+3.*nu));
-    double pn2_a2_ = .5  * v_2_ *   nu * (11.+4.*nu) + 4.*nv*nv_*(1. + nu*(12.+3.*nu));
-    double pn2_a   = nu  * pn2_a1  + m * _1_r * pn2_a2 - m * m * _1_r2 * (9. + 21.75 * nu);
-    double pn2_a_  = nu  * pn2_a1_ + m * _1_r * pn2_a2_ - m * _1_r3 * xv * pn2_a2 + 2. * m * m * _1_r2 * _1_r2 * xv * (9. + 21.75 * nu);
-    double pn2_b1  =  8. * v_2  * nv - 1.5*nv2*nv*(3.+2.*nu);
-    double pn2_b1_ =  8. * v_2_ * nv + 8.*v_2*nv_ - 4.5*nv2*nv_*(3.+nu+nu);
-    double pn2_b   = nu  * pn2_b1  - .5 * m * _1_r *  nv * (4. + 43.*nu);
-    double pn2_b_  = nu  * pn2_b1_ - .5 * m * _1_r * nv_ * (4. + 43.*nu) + .5 * m * _1_r3 * xv * nv * (4. + 43.*nu);
-    #endif
-    #ifdef PN25
-    double pn25_a  = v_2 + 3. * m * _1_r;
-    double pn25_a_ = v_2_ - 3. * m * xv * _1_r3;
-    double pn25_b  = 3. * v_2 + _17_3 * m * _1_r;
-    double pn25_b_ = 3. * v_2_ - _17_3 * m * xv * _1_r3;
-    #endif
-    for(k = 0; k < 3; k++)
-    {
-        a_[k] = .0;
-        #ifdef PN1
-        a_[k] += m * _1_r2 * (n_[k] * pn1_a + n[k] * pn1_a_
-                    + a[k] * pn1_b + v[k] * pn1_b_ - 2. * _1_r2 * xv * (n[k] * pn1_a + v[k] * pn1_b)) * __1_c2;
-        #endif
-        #ifdef PN2
-        a_[k] += m * _1_r2 * (n_[k] * pn2_a + n[k] * pn2_a_ + a[k] * pn2_b + v[k] * pn2_b_
-                    - 2. * xv * _1_r2 * (n[k] * pn2_a + v[k] * pn2_b)) * __1_c4;
-        #endif
-        #ifdef PN25
-        a_[k] -= 1.6*m*m*_1_r3*nu * (a[k] * pn25_a + v[k] * pn25_a_ - n_[k] * nv * pn25_b - n[k] * nv_ * pn25_b - n[k] * nv * pn25_b_
-                       - 3. * xv * _1_r2 * (v[k] * pn25_a - n[k] * nv * pn25_b)) * __1_c5;
-        #endif
-    }
-    _exit_function();
-}
-#endif // PN
-// END
-// gr_jerk_com
-
-//
 // path_integral
 //
 void path_integral(int order, double dt, struct particle *p, double sign)
@@ -626,10 +470,6 @@ void move_kepler(struct particle *parts, int pcount, double tmin)
     double *px, *pxp, *pv, *pvp;
     double dt;
     int j;
-    #ifdef PN_KEPLER
-    double gr_an[3], gr_a_n[3], dt2, dt3, dt4, dt5, _1_dt2, _1_dt3;
-    int i;
-    #endif
 
     for(j = 0; j < movecount; j++)
         if(parts[active[j]].t <= tmin - DT_TOLERANCE)
@@ -642,69 +482,14 @@ void move_kepler(struct particle *parts, int pcount, double tmin)
 
             dt = tmin - p->t;
 
-            #ifdef PN_KEPLER
-            if(p->use_pn)
-            {
-                dt *= PN_KEPLER_FACT;
-                if(p->switch_pn)
-                {
-                    gr_force_com(parts->m, p->m, pxp, pvp, p->gr_a);
-                    gr_jerk_com (parts->m, p->m, pxp, pvp, p->a, p->ha, p->gr_a, p->gr_a_);
-                }
-            }
-            #endif
-
             for(;p->t < tmin; p->t += dt)
             {
                 p->io_steps_c++;
-                #ifdef PN_KEPLER
-                if(p->use_pn)
-                {
-                    path_integral((PN_TRACK_ORDER > 3 && p->switch_pn) ? 3 : PN_TRACK_ORDER, dt, p, +1.);
-                }
-                #endif
 
                 step_kepler_1(parts, pcount, p - parts, dt, p->ha, p->ha_, p->ha_2,
                         p->ha_3
                         , &(p->curr_a), &(p->curr_e));
 
-                #ifdef PN_KEPLER
-                if(p->use_pn)// && !p->switch_pn)
-                {
-                    dt2    = dt * dt  * .5; dt3 = dt * dt2 * _1_3; dt4 = dt * dt3 * .25; dt5 = dt * dt4 * .2;
-                    _1_dt3 = 1. / dt3; _1_dt2 = _1_dt3 * dt * _1_3;
-
-                    // hermite predictor
-                    for(i = 0; i < DIMENSIONS; i++)
-                    {
-                        pxp[i] += dt2 * p->gr_a[i] + dt3 * p->gr_a_[i];// + dt4 * p->gr_a_2[i] + dt5 * p->gr_a_3[i];
-                        pvp[i] += dt  * p->gr_a[i] + dt2 * p->gr_a_[i];// + dt3 * p->gr_a_2[i] + dt4 * p->gr_a_3[i];
-                    }
-
-                    // hermite evaluator
-                    gr_force_com(parts->m, p->m, pxp, pvp, gr_an);
-
-                    //gr_jerk(parts->m, p->m, pxp, pvp, p->a, p->ha, gr_an, gr_a_n);
-                    gr_jerk_com(parts->m, p->m, pxp, pvp, p->a, p->ha, gr_an, gr_a_n);
-
-                    // hermite corrector
-                    for(i = 0; i < DIMENSIONS; i++)
-                    {
-                        p->gr_a_2[i] = -(3.*(p->gr_a[i]-gr_an[i]) + dt*(2.*p->gr_a_[i]+gr_a_n[i])) * _1_dt2;
-                        p->gr_a_3[i] =  (2.*(p->gr_a[i]-gr_an[i]) + dt*(p->gr_a_[i]+gr_a_n[i])) * _1_dt3;
-                        p->gr_a[i]   = gr_an[i];
-                        p->gr_a_[i]  = gr_a_n[i];
-                        pxp[i]      += dt4 * p->gr_a_2[i] + dt5 * p->gr_a_3[i];
-                        pvp[i]      += dt3 * p->gr_a_2[i] + dt4 * p->gr_a_3[i];
-                        px[i] = pxp[i];
-                        pv[i] = pvp[i];
-                    }
-
-                    // GR track energy
-                    // add only y1 here, y0 already added above
-                    path_integral((PN_TRACK_ORDER > 3 && p->switch_pn) ? 3 : PN_TRACK_ORDER, dt, p, -1.);
-                }
-                #endif // PN_KEPLER
             }
 
             px[0] = pxp[0]; px[1] = pxp[1]; px[2] = pxp[2];
@@ -729,40 +514,6 @@ void hermite_correct(struct particle *parts, int pcount)
     for(j = 0; j < movecount; j++)
     {
         p = parts + active[j];
-
-        #ifdef PN
-        if(p->use_pn && SWITCHOFF_PN)
-        {
-            p->switch_pn = 1;
-            p->use_pn = 0;
-            //if(p->name == P_IMBH)
-            fprintf(get_file(FILE_WARNING), "# [%1.8e] switching off PN for m%d\t(a=%e\te=%e\tT_inspiral=%e)\n",
-                    t_total(p->t + p->dt), p->name,
-                    convert_length(p->curr_a, 0), p->curr_e, convert_time(T_INSPIRAL, 0) );
-        }
-        else if (!p->use_pn && SWITCHON_PN && p->v_thresh_2 <= .0)
-        // ensure PN is switched on at increasing speed only, i.e. speed has fallen under threshold since last switchoff
-        {
-            p->switch_pn = 1;
-            p->use_pn = 1;
-            p->v_thresh_2 = scal_prod(p->vp, p->vp);
-            p->gr_a[0]  = p->gr_a[1]  = p->gr_a[2]  = .0;
-            p->gr_a_[0] = p->gr_a_[1] = p->gr_a_[2] = .0;
-            //if(p->name == P_IMBH)
-            fprintf(get_file(FILE_WARNING), "# [%1.8e] switching on PN for m%d\t(a=%e\te=%e\tT_inspiral=%e)\n",
-                t_total(p->t + p->dt), p->name,
-                convert_length(p->curr_a, 0), p->curr_e, convert_time(T_INSPIRAL, 0));
-        }
-        else p->switch_pn = 0;
-        if(p->use_pn)
-        {
-            // ???
-        }
-        else if(p->v_thresh_2 > 0 && !SWITCHON_PN)
-        // reset PN entry speed once speed has fallen below threshold
-        p->v_thresh_2 = .0;
-
-        #endif // PN
 
         // hermite corrector
         if(j == 0 || dt != p->dt)
@@ -1045,10 +796,10 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     _enter_function(_UL_HERMITE2, _UL_HERMITE2_EVALUATE_1);
     int new_close_warn = 0;
     int perturb = (posmax > 0 ? 1 : 0);
-    struct particle *p = parts+pos;
+    struct particle p = parts[pos];
     struct particle *pk = NULL;
-    double *px = p->xp;
-    double *pv = p->vp;
+    double px[3] = {p.xp[0], p.xp[1], p.xp[2]};
+    double pv[3] = {p.vp[0], p.vp[1], p.vp[2]};
     double maxforce = -1.0;
     double r_vic_2 = .0;
     double r1_2 = scal_prod(px, px);
@@ -1066,14 +817,14 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
         if(_sqrt_mratio == .0)
             _sqrt_mratio = sqrt(m_max() / parts[0].m);
 
-        r_vic_2 = _sqrt_mratio * v_abs(px) + (v_abs(p->vp) + sqrt(2. * parts[0].m / v_abs(px))) * 2. * p->dt;
+        r_vic_2 = _sqrt_mratio * v_abs(px) + (v_abs(p.vp) + sqrt(2. * parts[0].m / v_abs(px))) * 2. * p.dt;
         r_vic_2 *= r_vic_2;
     }
     else
-        r_vic_2 = v_abs(p->vp) * 2 * p->dt;
+        r_vic_2 = v_abs(p.vp) * 2 * p.dt;
 
     // calculate Schwarzschild sum of radii:  3 * rs = 3 * (2 * G * m1 / c² + 2 * G * m2 / c²)
-    rs_2 =  9. * C_2G_C2 * C_2G_C2 * (p->m + m_max()) * (p->m + m_max());
+    rs_2 =  9. * C_2G_C2 * C_2G_C2 * (p.m + m_max()) * (p.m + m_max());
 
     // calculate perturbing distance:
     //    F_perturb > fact * F_central, i. e.
@@ -1083,14 +834,14 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     // evaluate forces
 
     // approaching SMBH??
-    if(px0*px0 + px1*px1 + px2*px2 < 9. * C_2G_C2 * C_2G_C2 * (p->m + parts->m) * (p->m + parts->m))
+    if(px0*px0 + px1*px1 + px2*px2 < 9. * C_2G_C2 * C_2G_C2 * (p.m + parts->m) * (p.m + parts->m))
     {
         // collision in 3 Schwarzschild-radii
         fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of SMBH m0 and m%d: %e (r_S = %e) ####\n",
-                t_total(p->t),
-                p->name,
+                t_total(p.t),
+                p.name,
                 convert_length(v_abs(px), 0),
-                convert_length(C_2G_C2 * (parts->m + p->m), 0));
+                convert_length(C_2G_C2 * (parts->m + p.m), 0));
         fflush(get_file(FILE_WARNING));
         add_collision(p, parts);
     }
@@ -1273,11 +1024,7 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                     convert_length(p->curr_a, 0),
                     p->curr_e,
                     convert_length(v_abs(p->x), 0),
-                    #ifdef PN
-                    convert_time(T_INSPIRAL, 0)
-                    #else
                     .0
-                    #endif
                     );
                 fflush(get_file(FILE_OTHER));
             }

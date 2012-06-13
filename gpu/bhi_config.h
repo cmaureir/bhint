@@ -9,11 +9,6 @@
 #define ETA           0.1          // precision parameter: \eta from Aarseth (1985)
 
 
-/*          ******* USE PN TREATMENT *********          */
-//#define PN                         // Use post-Newtonian treatment
-                                   // ********** CONFIGURE BELOW **********
-
-
 /*          ************ OUTPUT **************          */
 #define PRINT_DETAIL               // print particle details for all particles (up to N_MAX_DETAIL), one line each
 #define PRINT_DETAIL_INTERVAL 100  // print details of all particles for every Nth output line
@@ -62,59 +57,3 @@
 #define M_ENCL(r)        M_ENCL_(r)
 
 /******************************************************************************/
-
-#ifdef PN
-
-/******************************************************************************
- *
- * Parameters for use of post-Newtonian terms.
- *
- * The SWITCH-parameters specify when (and for which particles) to switch PN treatment on and off.
- * Choose or combine nay of the examples.
- * Default: PN for all particles, but only if estimated inspiral time (Peters 1964) is below 100 Myr; switch off again if it exceeds 1 Gyr.
- * Make sure PN is not constantly switched for any particle (e.g., every revolution or so).
- *
- ******************************************************************************/
-
-#define PN_KEPLER_FACT .00390625   // Requires a reciprocal integer!
-
-/*
-  Peters 1964, Eq. 5.14: T = 12/19 * c0^4 / beta * INT(...) = T_c * 48/19 * (c0/a0)^4 * INT(...)
-  T / 4T_c * (1-e^2)^(-7/2) = 12/19 * (c0/a0)^4 * (1-e^2)^(-7/2) *INT(...) =: g(e) \in {0.2485..0.44} => g(e) ~= 0.3
-  => T = 4 T_c * (1-e^2)^(7/2) * g(e)
-
-  e_:=0.2: c0_a0:=(1-e_^2)/e_^(12/19)/(1+121/304*e_^2)^(870/2299):
-  T_Tc:=12/19*c0_a0^4*int(e^(29/19)*(1+121/304*e^2)^(1181/2299)/(1-e^2)^(3/2),e=0..e_)*4; # Fig. 2
-  evalf(T_Tc/4/(1-e_^2)^(7/2)); # =g(e), 0.24 < g(e) < 0.46
-*/
-
-#define T_INSPIRAL (square(square(p->curr_a)) / (__1_c5*.2*64.*parts[0].m*(parts[0].m+p->m)*p->m) * exp(3.5 * log(1. - square(p->curr_e))) *.3)
-
-
-/***** PN ONLY IF INSPIRAL TIME FALLS BELOW 100 MYR (switch off again if it exceeds 1 Gyr) *****/
-#define SWITCHON_PN  (T_INSPIRAL < convert_time(1.e8, 1))
-#define SWITCHOFF_PN (T_INSPIRAL > convert_time(1.e10, 1))
-
-
-/***** PN FOR ECCENTRIC PARTICLES ONLY: switch on for e>0.9, switch off when e falls below 0.8 *****/
-//#define SWITCHON_PN  (p->curr_e > .9 && (N_MAX_DETAIL <  -1 || p->name <= N_MAX_DETAIL))
-//#define SWITCHOFF_PN (p->curr_e < .8 || (N_MAX_DETAIL >= -1 && p->name >  N_MAX_DETAIL))
-
-
-/***** PN FOR DISPLAY PARTICLES ONLY *****/
-//#define SWITCHON_PN  (N_MAX_DETAIL <  -1 || p->name <= N_MAX_DETAIL)
-//#define SWITCHOFF_PN (N_MAX_DETAIL >= -1 && p->name >  N_MAX_DETAIL)
-
-
-/***** PN FOR PARTICLE NAME 1 ONLY *****/
-//#define SWITCHON_PN  (p->name == 1)
-//#define SWITCHOFF_PN (p->name != 1)
-
-
-/***** PN ALWAYS ON *****/
-//#define SWITCHON_PN  1
-//#define SWITCHOFF_PN 0
-
-/******************************************************************************/
-
-#endif
