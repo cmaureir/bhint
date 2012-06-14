@@ -1438,6 +1438,7 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     }
 
     // FOR
+    printf("%d\t%d\t%d\n", pos, posmin, posmax);
     for(pk = parts + posmin; pk <= parts + posmax; pk++)
     {
         if(pk == p)
