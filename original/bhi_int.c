@@ -1438,7 +1438,6 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     }
 
     // FOR
-    printf("%d\t%d\t%d\n", pos, posmin, posmax);
     for(pk = parts + posmin; pk <= parts + posmax; pk++)
     {
         if(pk == p)
@@ -1447,7 +1446,6 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
         x_0 = pkx[0] - px0; v_0 = pkv[0] - pv0;
         x_1 = pkx[1] - px1; v_1 = pkv[1] - pv1;
         x_2 = pkx[2] - px2; v_2 = pkv[2] - pv2;
-
         // calculate factors needed
         r_2 = x_0*x_0 + x_1*x_1 + x_2*x_2; //scal_prod(x_, x_);
 

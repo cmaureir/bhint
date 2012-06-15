@@ -666,7 +666,7 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
 
 
 void iteration( struct particle parts[],
-                struct particle p,
+                struct particle *p,
                 int pcount, int pos, int posmin, int posmax,
                 double *a0,  double *a1,  double *a2,
                 double *a_0, double *a_1, double *a_2,
@@ -688,7 +688,6 @@ void iteration( struct particle parts[],
     double _1_over_r2;
     int i;
 
-    printf("%d\t%d\t%d\n", pos, posmin, posmax);
     for(i = posmin; i <= posmax; i++)
     {
         if(i == pos)
@@ -706,7 +705,7 @@ void iteration( struct particle parts[],
 
         if(r_2 < min_r2)
         {
-            p.nearestneighbour = i;
+            p->nearestneighbour = i;
             min_r2 = r_2;
         }
 
@@ -724,51 +723,51 @@ void iteration( struct particle parts[],
                 (parts[i].m * r1_2 > PERTURBING_FORCE_RATIO * parts[0].m * r_2))
             )
             {
-                if(p.io_close_warn <= 0 || p.io_close_warn > 16 * r_2)
+                if(p->io_close_warn <= 0 || p->io_close_warn > 16 * r_2)
                 {
                     fprintf(get_file(FILE_DEBUG),
                             "#### [t=%1.12e] close encounter of m%d[%d] and m%d[%d]: %e (allowing %e, perturbing at %e) ####\n",
-                            t_total(p.t),
-                            p.name, pos,
+                            t_total(p->t),
+                            p->name, pos,
                             parts[i].name, i,
                             convert_length(sqrt(r_2), 0),
-                            convert_length(C_2G_C2 * (parts[i].m + p.m), 0),
+                            convert_length(C_2G_C2 * (parts[i].m + p->m), 0),
                             convert_length(sqrt(parts[i].m / parts[0].m * scal_prod(px, px)), 0));
                     fprintf(get_file(FILE_DEBUG),
                             " CE %1.12e\t%d\t%e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%d\t%e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\n",
-                            t_total(p.t),
+                            t_total(p->t),
                             parts[i].name, convert_mass(parts[i].m, 0),
                             convert_length(parts[i].xp[0], 0), convert_length(parts[i].xp[1], 0), convert_length(parts[i].xp[2], 0),
                             convert_length(convert_time(parts[i].vp[0], 1), 0), convert_length(convert_time(parts[i].vp[1], 1), 0), convert_length(convert_time(parts[i].vp[2], 1), 0),
-                            p.name, convert_mass(p.m, 0),
+                            p->name, convert_mass(p->m, 0),
                             convert_length(px[0], 0), convert_length(px[1], 0), convert_length(px[2], 0),
                             convert_length(convert_time(pv[0], 1), 0), convert_length(convert_time(pv[1], 1), 0), convert_length(convert_time(pv[2], 1), 0)
                             );
                     fflush(get_file(FILE_DEBUG));
-                    p.io_close_warn = r_2;
+                    p->io_close_warn = r_2;
                 }
                 *new_close_warn = 1;
-                p.energy = get_energy(parts, pcount, pos);
+                p->energy = get_energy(parts, pcount, pos);
             }
         if(
          (r_2 < rs_2) &&
          // calculate exact for star mass rather than maximum
-         (r_2 < 9. * C_2G_C2 * C_2G_C2 * (p.m + parts[i].m) * (p.m + parts[i].m)))
+         (r_2 < 9. * C_2G_C2 * C_2G_C2 * (p->m + parts[i].m) * (p->m + parts[i].m)))
         {
             // collision in 3 Schwarzschild-radii
             fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of m%d and m%d: %e (r_S = %e) ####\n",
-                    t_total(p.t),
-                    p.name,
+                    t_total(p->t),
+                    p->name,
                     parts[i].name,
                     convert_length(sqrt(r_2), 0),
-                    convert_length(C_2G_C2 * (parts[i].m + p.m), 0));
+                    convert_length(C_2G_C2 * (parts[i].m + p->m), 0));
             fflush(get_file(FILE_WARNING));
-            add_close(parts, &p, &parts[i]);
+            add_close(parts, p, &parts[i]);
         }
 
         // find approaching particles in vicinity
         else if(r_2 < r_vic_2 && v_x_ < 0)
-            add_close(parts, &p, &parts[i]);
+            add_close(parts, p, &parts[i]);
 
         *a0  += afact * x_0;
         *a_0 += afact * (v_0 - v_x_ * x_0);
@@ -839,7 +838,7 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
         add_collision(&p, parts);
     }
 
-    iteration( parts, p, pcount, pos, posmin, posmax,
+    iteration( parts, &p, pcount, pos, posmin, posmax,
                &a0,  &a1,  &a2, &a_0, &a_1, &a_2,
                px[0], px[1], px[2], pv[0], pv[1], pv[2],
                &maxforce, perturb, r_perturb_2,
