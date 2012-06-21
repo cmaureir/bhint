@@ -11,7 +11,6 @@
 #include <signal.h>
 #include "bhi.h"
 #include <time.h>
-#include <omp.h>
 
 #define SOFTENING_PAR_2  .0        // softening length squared (eps^2) for perturbing forces [TESTING]
                                    // NOTE: IN INTERNAL UNITS! For 3e-4 pc, choose:
@@ -99,14 +98,6 @@ double get_energy(struct particle parts[], int pcount, int pos)
         }
     }
 
-    #ifdef EXT_POT
-    double phi=.0;
-    add_force_extpot(p->x, NULL, NULL, NULL, &phi);
-    e += p->m * phi;
-    //printf("%d\t%e\n", pos, e);
-    #endif // EXT_POT
-
-
     _exit_function();
 
     return e;
@@ -158,7 +149,6 @@ void get_acc(struct particle parts[], int pcount, int pos, double acc[3])
             acc[i] -= p2->m / dist3 * (p->x[i] - p2->x[i]);
         }
     }
-
     _exit_function();
 }
 
@@ -181,15 +171,6 @@ double get_epot(struct particle parts[], int pcount, int pred)
                      : sqrt(v_dist(p1->x,  p2->x,  2) + (p1 > parts ? softening_par2 : 0)));
         }
     }
-
-    #ifdef EXT_POT
-    for(p1 = parts + 1; p1 < parts + pcount; p1++)
-    {
-        double phi=.0;
-        add_force_extpot(pred ? p1->xp : p1->x, NULL, NULL, NULL, &phi);
-        e_pot += p1->m * phi;
-    }
-    #endif // EXT_POT
 
     _exit_function();
 
@@ -281,7 +262,6 @@ void predict(struct particle parts[], int pcount, double t)
     {
         predict_part_hermite2(p, t);
     }
-
     _exit_function();
 }
 
@@ -448,14 +428,12 @@ void integrate( struct particle parts[], int pcount,
         get_reduced(parts, 1, &orig_e, &orig_a, &orig_t, &orig_j);//red_, red_+1, red_+2, red_+3);
         t_max = (orbits >= 0) ? (double)orbits * orig_t : -orbits;
 
-        // not need to be parallel
         for(j = 1; j < pcount; j++)
         {
             evaluate_1_2(parts, pcount, j, 0, 0, parts[j].ha, parts[j].ha_);
             evaluate_1_2(parts, pcount, j, 1, pcount - 1, parts[j].a, parts[j].a_);
             parts[j].dt = normalize_dt(parts[j].t, get_timestep_central(parts, parts + j, MIN_EVALS) * .01);
         }
-
         check_app(parts, pcount, .0);
 
         // print headlines
@@ -467,59 +445,55 @@ void integrate( struct particle parts[], int pcount,
                     count_steps + count_steps_over, count_blocks + count_blocks_over, orb_count);
     }
 
-    // Main loop
-    while(1)
+    // iterate
+    for(;; add_over(1, &count_blocks, &count_blocks_over))
     {
-        // Write dump file
-         if(ul_kill > 0 || (printed &&
-                    ((time(NULL) - lastdump > DUMP_INTERVAL)
-                    || (parts[1].t + t_over >= t_max && !force_print))))
-                {
-                    dumpfile = write_dump_io();
-                    fprintf(dumpfile,
-                            "MAX-TIME %1.32le\n",
-                            convert_time(t_max, 0));
-                    fprintf(dumpfile,
-                            "INTEGRATE-VARS %1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%16d\t%16d\t%16d\t%32ld\t%1.32le\t%32ld\t%1.32le\t%16d\n",
-                            t_maxval, t_eval, pt, e_, a_, t_, j_, rv_, rv, del_t, orig_a, orig_e, orig_j, orig_t, m_tot, t_old, t_over,
-                            orb_count, order, init, count_steps, count_steps_over, count_blocks, count_blocks_over, force_print);
-                    fprintf(dumpfile,
-                            "INTEGRATE-PARAMS %32d\t%32d\t%32d\t%1.32le\t%1.32le\n",
-                            pcount, method, print, orbits, t_steps);
-                    fprintf(dumpfile, "ENERGY %1.32le\n", lost_energy);
-                    fprintf(dumpfile, "PARTICLES ");
-                    i = fwrite(parts, sizeof(struct particle), pcount, dumpfile);
-                    if(i != pcount)
-                    {
-                        fprintf(get_file(FILE_WARNING), "### PROBLEM WRITING DUMP FILE: WROTE %d OF %d PARTICLES\n", i, pcount);
-                        fflush(get_file(FILE_WARNING));
-                    }
+        // Dump status at the beggining and at the end
+        if(ul_kill > 0 || (printed &&
+            ((time(NULL) - lastdump > DUMP_INTERVAL)
+            || (parts[1].t + t_over >= t_max && !force_print))))
+        {
+            dumpfile = write_dump_io();
+            fprintf(dumpfile,
+                    "MAX-TIME %1.32le\n",
+                    convert_time(t_max, 0));
+            fprintf(dumpfile,
+                    "INTEGRATE-VARS %1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%1.32le\t%16d\t%16d\t%16d\t%32ld\t%1.32le\t%32ld\t%1.32le\t%16d\n",
+                    t_maxval, t_eval, pt, e_, a_, t_, j_, rv_, rv, del_t, orig_a, orig_e, orig_j, orig_t, m_tot, t_old, t_over,
+                    orb_count, order, init, count_steps, count_steps_over, count_blocks, count_blocks_over, force_print);
+            fprintf(dumpfile,
+                    "INTEGRATE-PARAMS %32d\t%32d\t%32d\t%1.32le\t%1.32le\n",
+                    pcount, method, print, orbits, t_steps);
+            fprintf(dumpfile, "ENERGY %1.32le\n", lost_energy);
+            fprintf(dumpfile, "PARTICLES ");
+            i = fwrite(parts, sizeof(struct particle), pcount, dumpfile);
+            if(i != pcount)
+            {
+                fprintf(get_file(FILE_WARNING), "### PROBLEM WRITING DUMP FILE: WROTE %d OF %d PARTICLES\n", i, pcount);
+                fflush(get_file(FILE_WARNING));
+            }
 
-                    fclose(dumpfile);
-                    lastdump = time(NULL);
+            fclose(dumpfile);
+            lastdump = time(NULL);
 
-                    if(ul_kill > 0) break;
-                }
-
-        // End condition
+            if(ul_kill > 0) break;
+        }
         if(parts[1].t + t_over >= t_max && !force_print) break;
+
         printed = 0;
-        //printf("%d\tcount_blocks:%ld \tcount_blocks_over: %f\n",tmp, count_blocks, count_blocks_over);
-
-        // struct particle parts
-        // int pcount
-        // int ETA
-        // int MIN_EVALS
-        // double t_eval
-        steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
-
+        // integration step
+        t_old = parts[1].t + t_over;
+        switch(method)
+        {
+            case 'i':
+                steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
+                break;
+        }
         add_over(steps, &count_steps, &count_steps_over);
-
-        // Variable reset
         #ifdef INIT_TIME
-        if( (init_phase)        &&
-            (steps == pcount-1) &&
-            (parts[1].t + t_over >= INIT_TIME))
+        /*       if(steps >= pcount-1) */
+        /* 	printf("%d\t%ld\t%e\t%e\n", init_phase, steps, parts[1].t + t_over, INIT_TIME); */
+        if(init_phase && (steps == pcount-1) && (parts[1].t + t_over >= INIT_TIME))
         {
             re_init(parts, pcount);
             init_phase = 0;
@@ -577,16 +551,14 @@ void integrate( struct particle parts[], int pcount,
 
         if(t_old < t_max && parts[1].t + t_over >= t_max)
             force_print = 1;
+
         if(t_steps >= 0 )// && parts[1].t > 0)
         {
             force_print = output(force_print ? -1 : print, parts, pcount, t_old, pt, parts[1].t, t_over, orbits, t_steps,
                                  t_max, count_steps + count_steps_over, count_blocks + count_blocks_over, orb_count);
             if(!force_print) printed = 1;
         }
-        // Counter
-        add_over(1, &count_blocks, &count_blocks_over);
     }
-    // END Main loop
 
     // output initial & end values
     get_reduced(parts, 1, &e_, &a_, &t_, &j_);
@@ -661,9 +633,6 @@ void sigproc(int signal)
     _exit_function();
 }
 
-//
-// Main
-//
 int main(int argc, char **argv)
 
      /* PARAMETERS:
@@ -707,6 +676,7 @@ int main(int argc, char **argv)
         t_ = t_maxval + DT_TOLERANCE * .5;
     }
     t_maxval *= .5;
+
 
     if(argc > 1) method = argv[1][0];
     switch(method)
@@ -777,21 +747,15 @@ int main(int argc, char **argv)
                 DT_TOLERANCE, t_maxval, P_IMBH
                 , 0
                 , 0
-                #ifdef EXT_POT
-                , 1
-                #else
                 , 0
-                #endif
         );
 
-        #ifdef EXT_POT
-        fprintf(get_file(FILE_OUTPUT), "# EXTERNAL POTENTIAL: RHO0=%e\tGAMMA1=%e\tGAMMA2=%e\tRMIN=%e\tR0=%e\tRMAX=%e\n",
-                EP_RHO0, EP_GAMMA1, EP_GAMMA2, EP_RMIN, EP_R0, EP_RMAX);
-        #else
         fprintf(get_file(FILE_OUTPUT), "# NO EXTERNAL POTENTIAL\n");
-        #endif
         #ifdef N_MAX_DETAIL
         fprintf(get_file(FILE_OUTPUT), "# N_MAX_DETAIL=%d\n", N_MAX_DETAIL);
+        #endif
+        #ifdef N_MAX_SSE
+        fprintf(get_file(FILE_OUTPUT), "# N_MAX_SSE=%d\n", N_MAX_SSE);
         #endif
         fprintf(get_file(FILE_OUTPUT),
                 "# enclosed mass for Kepler parameter: M(<.01pc)=%e\tM(<.04pc)=%e\tM(<.1pc)=%e\tM(<.4pc)=%e\tM(<1.pc)=%e\n",

@@ -60,7 +60,20 @@ int check_fast_approaches(  struct particle *parts,
 
   for(i = 0; i < 3; i++)
   {
-      x[i]  = px[i] - pkx[i];
+      if(1)
+      {
+          x[i]  = px[i] - pkx[i];
+      }
+      else
+      {
+          x[i]  = px[i] - (pkx[i]
+                  + dt * pk->v[i]
+                  + dt2 * (pk->a[i] + pk->ha[i])
+                  + dt3 * (pk->a_[i] + pk->ha_[i])
+                  + dt4 * (pk->a_2[i] + pk->ha_2[i])
+                  + dt5 * (pk->a_3[i] + pk->ha_3[i])
+          );
+      }
 
       if(pk->active)
       {

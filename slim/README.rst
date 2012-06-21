@@ -1,6 +1,6 @@
-Beta!
+Slim
 =====
 
-This versions aims to have
-a **bhint** version without SSE and GRAPE,
-but it's not working now.
+This versions have
+a **bhint** version without SSE, GRAPE and PN options
+and configuration
