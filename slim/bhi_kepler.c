@@ -7,7 +7,6 @@
 enum _function {_UL_KEPLER_GET_COMMON=0, _UL_KEPLER_GET_JACOBI, _UL_KEPLER_UNJACOBI, _UL_KEPLER_GET_CONSTANTS,
                 _UL_KEPLER_GET_REDUCED, _UL_KEPLER_STEP_KEPLER_1, _UL_KEPLER_STEP_KEPLER, _UL_KEPLER_SOLVE_KEPLER,
                 _UL_KEPLER_KEPLER};
-//#define TEST_KEPLER
 #define DEL_E          9.e-16  /* maximum error in angle E for kepler equation            */
 #define DEL_E_HYP      2.e-15  /* maximum error in angle E for hyperbolic kepler equation */
 #define MAX_ITER       50      /* maximum number of iterations to solve kepler            */
@@ -28,7 +27,6 @@ static double
     _1_4_3 = 1./4./3.,
     _1_3_2 = 1./3./2.;
 
-#ifndef TEST_KEPLER
 /*
  * Get center of mass / total momentum
  * of predicted values for first _pcount_ particles into _com_.
@@ -390,7 +388,6 @@ int step_kepler(struct particle parts[], int pcount)
     _exit_function();
     return pcount-1;
 }
-#endif // TEST_KEPLER
 
 /*
  * Solve kepler equation for given
@@ -408,11 +405,7 @@ double solve_kepler(double mean, double ecc)
     {
         if(n_iter++ > MAX_ITER)
         {
-            #ifndef TEST_KEPLER
             fprintf(get_file(FILE_WARNING),
-            #else
-            printf(
-            #endif
                 "### Aborting elliptical kepler solution after %d iterations, keeping error of %e (e=%e, M=%e, E_=%1.12e, sin(E_)=%1.12e)\n",
                 MAX_ITER, d,
                 ecc, mean, e, sin(e));
@@ -483,11 +476,7 @@ double kepler(const double ecc, double mean_anom)
 
             if(n_iter > MAX_ITER) // amended
             {
-                #ifndef TEST_KEPLER
                 fprintf(get_file(FILE_WARNING),
-                #else
-                printf(
-                #endif
                     "#### ! Aborting kepler solution after %d iterations, keeping error of %e (e=%e, M=%e, E_=%e) ####\n",
                     MAX_ITER, err,
                     ecc, mean_anom, curr);
@@ -558,11 +547,7 @@ double kepler(const double ecc, double mean_anom)
             }
             if(n_iter > MAX_ITER) // amended
             {
-                #ifndef TEST_KEPLER
                 fprintf(get_file(FILE_WARNING),
-                #else
-                printf(
-                #endif
                     "### Aborting hyperbolic kepler solution after %d iterations, keeping error of %e (e=%e, M=%e, E_=%1.12e, sinh(E_)=%1.12e)\n",
                     MAX_ITER, err,
                     ecc, mean_anom, curr, sinh(curr));
@@ -575,46 +560,3 @@ double kepler(const double ecc, double mean_anom)
     _exit_function();
     return(is_negative ? -curr : curr);
 }
-
-
-#ifdef TEST_KEPLER
-double kepler2(const double ecc, double mean_anom)
-{
-    return ecc < 1. ? solve_kepler(mean_anom, ecc) : kepler(ecc, mean_anom);
-}
-
-#include <time.h>
-double drand(double a, double b)
-{
-    return a + rand()/(double)RAND_MAX * (b - a);
-}
-
-int main(int argc, char **argv)
-{
-    int i, imax=1e6;
-    seedrand();
-
-    //for(i = 0; i < 1e6; i++) kepler2(atof(argv[1]), atof(argv[2]));
-    //printf("kep = %1.20e\n", kepler2(atof(argv[1]), atof(argv[2])));
-
-    double sum=.0, ecc;
-    double v2, vr2, sum_vr2=.0, sum_vt2=.0;
-    for(i = 0; i < imax; i++)
-    {
-        ecc = sqrt(drand(.0, 1.));
-        double E = cos(kepler2(ecc, drand(.0, 2. * M_PI)));
-        sum += 1. - ecc * E;
-
-        v2  = (1 + ecc*cos(E)) / (1 - ecc*cos(E));
-        vr2 = ecc * sin(E) / (1 - ecc * cos(E));
-        vr2 *= vr2;
-
-        sum_vr2 += vr2;
-        sum_vt2 += v2 - vr2;
-    }
-
-    printf("r=%1.5f\t1-beta=%1.5f\n", sum / ((double) imax), sum_vt2 / (2. * sum_vr2));
-
-    return 0;
-}
-#endif

@@ -96,7 +96,9 @@ double get_imf_mass(double *m, double *alpha, int n, double *r, double *f)
     return pow((p - f[i]) * (alpha[i] + 1.) / r[i] + pow(m[i], alpha[i] + 1.), 1. / (alpha[i] + 1.));
 }
 
+//#define __UL_UTIL__GAUSS
 #define __UL_UTIL__IMF
+//#define __UL_UTIL__TEST
 #ifdef __UL_UTIL__TEST
 
 int main(int argc, char **argv)

@@ -250,17 +250,11 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[j].x, (*parts)[j].x + 1, (*parts)[j].x + 2,
                     (*parts)[j].v, (*parts)[j].v + 1, (*parts)[j].v + 2);
 
-
                     if((*parts)[j].m < 0)
                     {
                         (*parts)[j].m = -(*parts)[j].m;
-                        (*parts)[j].sse_multiple = 2;
                     }
 
-                    else
-                    {
-                        (*parts)[j].sse_multiple = 1;
-                    }
                     //#endif
                     (*parts)[j].m /= _conv_m;
                     (*parts)[j].x[0] /= _conv_x;
@@ -351,7 +345,6 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                     (*parts)[k].phi_stars -= (*parts)[j].m * _1_r;
                 }
 
-                add_force_extpot((*parts)[j].x, NULL, NULL, NULL, &((*parts)[j].phi_bgr));
                 (*parts)[j].energy = (*parts)[j].m * (.5 * (scal_prod((*parts)[j].v, (*parts)[j].v) + (*parts)[j].phi_stars) + (*parts)[j].phi_bgr
                                      - (*parts)[0].m / v_abs((*parts)[j].x));
             }
@@ -596,7 +589,7 @@ int output( int print, struct particle parts[], int pcount,
                         #endif
                         , p->energy
                         , p->energy + p->m * (.5 * p->phi_stars /*+ p->phi_bgr*/)
-                        , p->sse_multiple
+                        , 1
                         );
 
                 p->rmin = 1.e99;
