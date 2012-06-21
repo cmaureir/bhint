@@ -7,11 +7,13 @@
 LIBS=
 
 CFLAGS=-Wall -O3 -pg -fopenmp
-CC=gcc
+CC=g++
+NVCC=nvcc
 GET=co
 OBJS=bhi_int.o  bhi_io.o  bhi_kepler.o  bhi_timestep.o  bhi_util.o  bhi_vector.o
 DEPEND= makedepend $(CFLAGS)
 LDFLAGS=-L . -L /opt/SUNWhpc/lib $(G2C) $(LIBS) -lm -pg -fopenmp -Wall
+CUFLAGS= -L /usr/local/cuda/lib64 -lcudart -lcuda
 
 
 all: bhint
@@ -25,11 +27,13 @@ clean:
 cleanall: clean
 	make -C clean
 
+bhi_int.o: bhi_int.cu
+	$(NVCC) -c $^
+
 %.o: %.c bhi.h bhi_config.h
 	$(CC) $(CFLAGS) -c $*.c
 
 # To make an executable
 
 bhint: $(OBJS) bhi_main.o
-	$(CC) -o bhint $(OBJS) bhi_main.o $(LDFLAGS)
-
+	$(CC) -o bhint $(OBJS) bhi_main.o $(LDFLAGS) $(CUFLAGS)

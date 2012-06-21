@@ -383,7 +383,7 @@ void integrate( struct particle parts[], int pcount,
 
         //PARTICLES
         fscanf(dumpfile, "%*s%*c");
-        assert(pcount == fread(parts, sizeof(struct particle), pcount, dumpfile));
+        assert(pcount == (int)fread(parts, sizeof(struct particle), pcount, dumpfile));
 
         for(p = parts; p < parts + pcount; p++)
             if(p > parts && p->m > _m_max
