@@ -12,15 +12,7 @@
 #include "bhi.h"
 
 #define CLOSE_MAX     100          // (initial) maximum number of neighbours; is increased dynamically
-//#define DT_AARSETH_ALL
 #define WARN_ENERGY_FACT .2
-//#define WARN_ENERGYALL
-#define MAX_REDUCECOUNT 3
-
-#define NO_USE_MASS_SUM
-
-#define SWITCHON_PN  0
-#define SWITCHOFF_PN 1
 
 static struct timeval start, finish;
 extern int ul_kill;
@@ -36,7 +28,6 @@ struct t_forceterm {
     double a[3], a_[3];
 };
 struct t_forceterm forceterm[N_MAX];
-struct t_forceterm forcesum[N_MAX];
 
 struct t_close {
     struct particle *p, *pk;
@@ -47,7 +38,7 @@ struct t_close *close_list = NULL;
 int active[N_MAX], remove_part[N_MAX], movecount;
 
 static int node_posmin=-1, node_posmax=-1;
-static double _1_3 = 1. / 3., _1_6 = 1. / 6., _1_12 = 1. / 12., _1_14 = 1. / 14., _sqrt_mratio = .0;
+static double _1_3 = 1. / 3., _sqrt_mratio = .0;
 
 static double step_size[2*MAX_STEPSIZE_POWER];
 static int step_alloc[2*MAX_STEPSIZE_POWER], step_count[2*MAX_STEPSIZE_POWER],
@@ -192,13 +183,12 @@ void add_close(struct particle *parts, struct particle *p, struct particle *pk)
         if(close_2 == NULL)
         {
             fprintf(get_file(FILE_WARNING), "#### MEMORY ERROR (%d): Ignoring close encounter m%d and m%d ####\n",
-                    close_max,
+                    CLOSE_MAX,
                     p->name, pk->name);
                     fflush(get_file(FILE_WARNING));
             _exit_function();
             return;
         }
-        //printf("!!! %d\n", close_max);
         if(close_list != close_2)
             close_list = close_2;
        close_max *= 2;
@@ -413,52 +403,6 @@ void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
 // END
 // find_move_particles
 
-// path_integral
-//
-void path_integral(int order, double dt, struct particle *p, double sign)
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_PATH_INTEGRAL);
-
-    double a[3]   = {p->a[0]   + p->ha[0]   + p->gr_a[0],   p->a[1]   + p->ha[1]   + p->gr_a[1],   p->a[2]   + p->ha[2]   + p->gr_a[2]};
-    double a_[3]  = {p->a_[0]  + p->ha_[0]  + p->gr_a_[0],  p->a_[1]  + p->ha_[1]  + p->gr_a_[1],  p->a_[2]  + p->ha_[2]  + p->gr_a_[2]};
-    double a_2[3] = {p->a_2[0] + p->ha_2[0] + p->gr_a_2[0], p->a_2[1] + p->ha_2[1] + p->gr_a_2[1], p->a_2[2] + p->ha_2[2] + p->gr_a_2[2]};
-
-    switch(order)
-    {
-        case 0:
-            break;
-        case 1:
-            //     trapezium rule              // F =     1/2 * (x1 - x0)   * (y1    + y0   )
-            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a)));
-            break;
-        case 3:
-            //     PN_TRACK_3RD                // F =     1/2 * (x1 - x0)   * (y1    + y0   )
-                                               //       -1/12 * (x1 - x0)^2 * (y1'   - y0'  )
-            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a) + sign * _1_6 * dt * (scal_prod(a, p->gr_a) + scal_prod(p->v, p->gr_a_))));
-            break;
-        case 5:
-            //     PN_TRACK_5TH                // F =     1/2 * (x1 - x0)   * (y1    + y0   )
-                                               //       -1/10 * (x1 - x0)^2 * (y1'   - y0'  )
-                                               //      +1/120 * (x1 - x0)^3 * (y1(2) + y0(2))
-            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a) + sign * .2 * dt * (scal_prod(a, p->gr_a) + scal_prod(p->v, p->gr_a_)
-                                 + sign * _1_12 * dt * (scal_prod(a_, p->gr_a) + 2. * scal_prod(a, p->gr_a_) + scal_prod(p->v, p->gr_a_2)))));
-            break;
-        case 7:
-            //     PN_TRACK_7TH                // F =     1/2 * (x1 - x0)   * (y1    + y0   )
-                                               //       -3/28 * (x1 - x0)^2 * (y1'   - y0'  )
-                                               //       +1/84 * (x1 - x0)^3 * (y1(2) + y0(2))
-                                               //     -1/1680 * (x1 - x0)^4 * (y1(3) - y0(3))
-            emit_energy(-.5 * dt * p->m * (scal_prod(p->v, p->gr_a) + sign * _1_14 * dt * (3 * (scal_prod(a, p->gr_a) + scal_prod(p->v, p->gr_a_))
-                            + sign * _1_3 * dt * (scal_prod(a_, p->gr_a) + 2. * scal_prod(a, p->gr_a_) + scal_prod(p->v, p->gr_a_2)
-                            + sign * .05 * dt * (scal_prod(a_2, p->gr_a) + 3. * scal_prod(a_, p->gr_a_) + 3. * scal_prod(a, p->gr_a_2)
-                            + scal_prod(p->v, p->gr_a_3))))));
-    }
-    _exit_function();
-}
-// END
-// path_integral
-
-
 //
 // move_kepler
 //
@@ -510,6 +454,7 @@ void hermite_correct(struct particle *parts, int pcount)
     int i, j;
     struct particle *p;
 
+    printf("hermite_correct::movecount = %d\n",movecount);
     for(j = 0; j < movecount; j++)
     {
         p = parts + active[j];
@@ -518,16 +463,25 @@ void hermite_correct(struct particle *parts, int pcount)
         if(j == 0 || dt != p->dt)
         {
             dt     = p->dt;
-            dt2    = dt * dt  * .5; dt3 = dt * dt2 * _1_3; dt4 = dt * dt3 * .25; dt5 = dt * dt4 * .2;
+            dt2    = dt * dt  * .5;
+            dt3 = dt * dt2 * _1_3;
+            dt4 = dt * dt3 * .25;
+            dt5 = dt * dt4 * .2;
             _1_dt3 = 1. / dt3; _1_dt2 = _1_dt3 * dt * _1_3;
         }
         for(i = 0; i < DIMENSIONS; i++)
         {
+            // Second derivate of the acceleration
             p->a_2[i] = -(3.*(p->a[i]-p->an[i]) + p->dt*(2.*p->a_[i]+p->a_n[i])) * _1_dt2;
+            // Third derivate of the acceleration
             p->a_3[i] =  (2.*(p->a[i]-p->an[i]) + p->dt*(p->a_[i]+p->a_n[i])) * _1_dt3;
+            // Update the position
             p->x[i]  += dt4 * p->a_2[i] + dt5 * p->a_3[i];
+            // Update the velocity
             p->v[i]  += dt3 * p->a_2[i] + dt4 * p->a_3[i];
+            // Update acceleration
             p->a[i]   = p->an[i];
+            // Update jerk
             p->a_[i]  = p->a_n[i];
         }
     }
@@ -620,41 +574,49 @@ void find_timesteps(struct particle *parts, int pcount, double tmin, double eta,
 
 //
 // herm_pred
+// Calculate the prediction position and velocity values
 //
-void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
+void herm_pred(struct particle *parts, int pcount, double tmin)
 {
     _enter_function(_UL_HERMITE2, _UL_HERMITE2_HERM_PRED);
     double dt, dt2, dt3, dt4, dt5;
-    int i;
-    struct particle *p;
+    int j;
 
-    for(p = parts + 1; p < parts + pcount; p++)
+    for(j = 1; j < pcount; j++)
     {
-        if(!p->active && (p->t <= tmin - DT_TOLERANCE))
+        if(!parts[j].active && (parts[j].t <= tmin - DT_TOLERANCE))
         {
-            dt = tmin - p->t;
-            dt2 = .5 * dt * dt; dt3 = dt * dt2 * _1_3; dt4 = .25 * dt * dt3; dt5 = .2 * dt * dt4;
-            for(i = 0; i < DIMENSIONS; i++)
-                p->xp[i] = p->x[i]+ dt * p->v[i] + dt2 * (p->a[i] + p->ha[i]) + dt3 * p->ha_[i]
-                                       + dt4 * p->ha_2[i]+ dt5 * p->ha_3[i];
+            dt = tmin - parts[j].t;
+            dt2 =  0.5 * dt * dt;
+            dt3 = _1_3 * dt * dt2;
+            dt4 = 0.25 * dt * dt3;
+            dt5 =  0.2 * dt * dt4;
+            parts[j].xp[0] = parts[j].x[0]+ dt * parts[j].v[0] + dt2 * (parts[j].a[0] + parts[j].ha[0]) + dt3 * parts[j].ha_[0] + dt4 * parts[j].ha_2[0]+ dt5 * parts[j].ha_3[0];
+            parts[j].xp[1] = parts[j].x[1]+ dt * parts[j].v[1] + dt2 * (parts[j].a[1] + parts[j].ha[1]) + dt3 * parts[j].ha_[1] + dt4 * parts[j].ha_2[1]+ dt5 * parts[j].ha_3[1];
+            parts[j].xp[2] = parts[j].x[2]+ dt * parts[j].v[2] + dt2 * (parts[j].a[2] + parts[j].ha[2]) + dt3 * parts[j].ha_[2] + dt4 * parts[j].ha_2[2]+ dt5 * parts[j].ha_3[2];
         }
         else
         {
-            if(p->active)
+            if(parts[j].active)
             {
-                dt = p->dt;
-                dt2 = dt * dt  * .5; dt3 = dt * dt2 * _1_3; dt4 = dt * dt3 * .25; dt5 = dt * dt4 * .2;
-                for(i = 0; i < DIMENSIONS; i++)
-                {
-                    p->x[i] += dt2 * p->a[i] + dt3 * p->a_[i];// + dt4 * p->a_2[i] + dt5 * p->a_3[i];
-                    p->v[i] += dt  * p->a[i] + dt2 * p->a_[i];// + dt3 * p->a_2[i] + dt4 * p->a_3[i];
-                }
+                dt = parts[j].dt;
+                dt2 = dt * dt  * .5;
+                dt3 = dt * dt2 * _1_3;
+                dt4 = dt * dt3 * .25;
+                dt5 = dt * dt4 * .2;
+                parts[j].x[0] += dt2 * parts[j].a[0] + dt3 * parts[j].a_[0];
+                parts[j].x[1] += dt2 * parts[j].a[1] + dt3 * parts[j].a_[1];
+                parts[j].x[2] += dt2 * parts[j].a[2] + dt3 * parts[j].a_[2];
+                parts[j].v[0] += dt  * parts[j].a[0] + dt2 * parts[j].a_[1];
+                parts[j].v[1] += dt  * parts[j].a[1] + dt2 * parts[j].a_[2];
+                parts[j].v[2] += dt  * parts[j].a[2] + dt2 * parts[j].a_[2];
             }
-            for(i = 0; i < DIMENSIONS; i++)
-            {
-                p->xp[i] = p->x[i];
-                p->vp[i] = p->v[i];
-            }
+            parts[j].xp[0] = parts[j].x[0];
+            parts[j].xp[1] = parts[j].x[1];
+            parts[j].xp[2] = parts[j].x[2];
+            parts[j].vp[0] = parts[j].v[0];
+            parts[j].vp[1] = parts[j].v[1];
+            parts[j].vp[2] = parts[j].v[2];
         }
     }
 
@@ -873,19 +835,18 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         node_posmax = *pcount - 1;
     }
 
-    // find particles to move
+    // 1. Find particles to move
     init_dt(parts, *pcount, 0);
-
     find_move_particles(parts, *pcount, &tmin);
 
     // make sure to move at least 1 particle
     assert(movecount > 0);
 
-    // forward all particles to tmin along orbit
+    // 2. Forward all particles to tmin along orbit
     move_kepler(parts, *pcount, tmin);
 
-    // hermite predictor
-    herm_pred(parts, *pcount, tmin, 0);
+    // 3. Hermite predictor
+    herm_pred(parts, *pcount, tmin);
 
     T_START;
 
@@ -896,23 +857,22 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
         en = p->m * (.5 * (scal_prod(p->v, p->v) + p->phi_stars) + p->phi_bgr - parts[0].m / v_abs(p->x));
         if(p->energy != .0)
         {
-        //en = get_energy(parts, *pcount, p - parts);
-        if(fabs(en - p->energy) > WARN_ENERGY_FACT * fabs(p->energy))
-            fprintf(get_file(FILE_DEBUG),
-                "#### [t=%1.12e+%1.4e] particle m%d gained %1.2f%% energy from %e to %e, at [%e\t%e\t%e\t%e\t%e\t%e\t] ####\n",
-                t_total(tmin-p->dt), convert_time(p->dt, 0),
-                p->name,
-                100.*(en/p->energy-1.),
-                p->energy, en,
-                convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
-                convert_length(convert_time(p->v[0], 1), 0),
-                convert_length(convert_time(p->v[1], 1), 0),
-                convert_length(convert_time(p->v[2], 1), 0));
+            if(fabs(en - p->energy) > WARN_ENERGY_FACT * fabs(p->energy))
+                fprintf(get_file(FILE_DEBUG),
+                    "#### [t=%1.12e+%1.4e] particle m%d gained %1.2f%% energy from %e to %e, at [%e\t%e\t%e\t%e\t%e\t%e\t] ####\n",
+                    t_total(tmin-p->dt), convert_time(p->dt, 0),
+                    p->name,
+                    100.*(en/p->energy-1.),
+                    p->energy, en,
+                    convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
+                    convert_length(convert_time(p->v[0], 1), 0),
+                    convert_length(convert_time(p->v[1], 1), 0),
+                    convert_length(convert_time(p->v[2], 1), 0));
         }
         p->energy = en;
     }
 
-    // hermite evaluator
+    // 4. Hermite evaluator
     for(j = 0; j < movecount; j++)
         evaluate_1_2(parts, *pcount, active[j],node_posmin, node_posmax, forceterm[j].a, forceterm[j].a_);
 
@@ -1119,7 +1079,7 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
             if(re_evaluate)
             {
                 fprintf(get_file(FILE_WARNING),
-                    "#### [t=%1.12e] Need to re-evaluate %d moved particles.\n",
+                        "#### [t=%1.12e] Need to re-evaluate %d moved particles.\n",
                         t_total(tmin), movecount);
                 for(j = 0; j < movecount; j++)
                     if(active[j] > 0 && active[j] < *pcount)
