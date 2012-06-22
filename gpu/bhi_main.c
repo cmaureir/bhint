@@ -458,7 +458,6 @@ void integrate( struct particle parts[], int pcount,
         {
                 steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
         }
-        printf("steps: %d\n", steps);
         add_over(steps, &count_steps, &count_steps_over);
         #ifdef INIT_TIME
         if(init_phase && (steps == pcount-1) && (parts[1].t + t_over >= INIT_TIME))

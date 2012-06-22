@@ -145,8 +145,6 @@ void predict_part_hermite2(struct particle *p, double t)
     dtn = t - p->htlast;
     dt2n = dtn * dtn  * .5; dt3n = dtn * dt2n * _1_3; dt4n = dtn * dt3n * .25; dt5n = dtn * dt4n * .2;
 
-    //**/fprintf("## predicting #%d by %e for t=%1.12e\n", p->name, dt, tmin);      fflush(stdout);
-
     for(i = 0; i < DIMENSIONS; i++)
     {
         // orbital movement
@@ -454,7 +452,6 @@ void hermite_correct(struct particle *parts, int pcount)
     int i, j;
     struct particle *p;
 
-    printf("hermite_correct::movecount = %d\n",movecount);
     for(j = 0; j < movecount; j++)
     {
         p = parts + active[j];
