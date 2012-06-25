@@ -14,18 +14,13 @@ enum _function {_UL_IO_OPEN_FILE=0, _UL_IO_INIT_FILES, _UL_IO_GET_PARAMS, _UL_IO
                 _UL_IO_CALC, _UL_IO_CREATE, _UL_IO_OUTPUT_ENERGY, _UL_IO_CONVERT_TO_NBODY_UNITS,
                 _UL_IO_CALC_ENERGIES, _UL_IO_COMMENT_DATAFILE};
 
-//#define DUMP_BEFORE_ERR [TESTING]
 #define OUTPUT_INITDATA       0    // maximum particle name to print initial data for; -1 for all
 #define MAX_FILES 20
-//#define _CONV_M 1. //CONV_M_SOLMASS
-//#define _CONV_X 1. //CONV_X_PARSEC
-//#define _CONV_T 1. //CONV_T_YEAR
 #define _CONV_M (CONV_M_SOLMASS * CONVINT_M_AU3DAY2)
 #define _CONV_X (CONV_X_PARSEC  * CONVINT_X_AU)
 #define _CONV_T (CONV_T_YEAR    * CONVINT_T_DAY)
 #define _CONV_V (_CONV_X / _CONV_T)
 #define _CONV_E (_CONV_M * _CONV_M / _CONV_X)
-//#define PRINT_DETAIL_AB            // in addition to _XV, print also semi-major and -minor vectors a, b
 
 static char *filename;
 static double t_last=.0, e_last=.0;
@@ -631,7 +626,7 @@ void calc(char **argv)
 {
     _enter_function(_UL_IO, _UL_IO_CALC);
     int i;
-    double r_[3], v_[3], j_[3], e_[3], omega, e, j, a_[3], b_[3], a, b, m=atof(argv[0])/_conv_m;
+    double r_[3], v_[3], j_[3], e_[3], omega, j, a_[3], e, b_[3], a, b, m=atof(argv[0])/_conv_m;
 
     for(i = 0; i < 3; i++)
     {
@@ -642,13 +637,9 @@ void calc(char **argv)
     j = v_abs(j_); e = v_abs(e_);
     printf("x=(%e, %e, %e), |x|=%e\n", r_[0] * _conv_x, r_[1] * _conv_x, r_[2] * _conv_x, v_abs(r_) * _conv_x);
     printf("v=(%e, %e, %e), |v|=%e\n", v_[0] * _conv_v, v_[1] * _conv_v, v_[2] * _conv_v, v_abs(v_) * _conv_v);
-    //printf("j=(%e, %e, %e), |j|=%e\n", j_[0], j_[1], j_[2], j);
     printf("e=(%e, %e, %e), |e|=%1.22e\n", e_[0], e_[1], e_[2], e);
-    //printf("p=(%e, %e, %e)\n", e_[0]/e*j*j/(1-e),  e_[1]/e*j*j/(1-e),  e_[2]/e*j*j/(1-e));
     printf("peri=(%e, %e, %e)\n", a * (1-e) * e_[0]/e * _conv_x, a * (1-e) * e_[1]/e * _conv_x, a * (1-e) * e_[2]/e * _conv_x);
     printf("apo=(%e, %e, %e)\n", a * (-e-1) * e_[0]/e * _conv_x, a * (-e-1) * e_[1]/e * _conv_x, a * (-e-1) * e_[2]/e * _conv_x);
-    //printf("center=(%e, %e, %e)\n", -a * e_[0] * _conv_x, -a * e_[1] * _conv_x, -a * e_[2] * _conv_x);
-    //-e[0]/e_*j_*j_/(1+e_) * _conv_x,  -e[1]/e_*j_*j_/(1+e_) * _conv_x,  -e[2]/e_*j_*j_/(1+e_) * _conv_x);
 
     vec_prod(j_, e_, b_);
     b = a * sqrt(fabs(1-e*e)) / v_abs(b_);
@@ -660,20 +651,6 @@ void calc(char **argv)
 
     printf("T=%e\na=%2.18f\t\n", 2*M_PI/omega * _conv_t, a*_conv_x);
 
-  /*
-    printf("a=(%e, %e, %e), |a|=%e\n", a_[0] * _conv_x, a_[1] * _conv_x, a_[2] * _conv_x, v_abs(a_) * _conv_x);
-    printf("b=(%e, %e, %e), |b|=%e\n", b_[0] * _conv_x, b_[1] * _conv_x, b_[2] * _conv_x, v_abs(b_) * _conv_x);
-    printf("#	, %e*cos(t)+%e*sin(t)+%e, %e*cos(t)+%e*sin(t)+%e notitle with lines 2\\\n",
-    a_[0] * _conv_x, b_[0] * _conv_x, -a * e_[0] * _conv_x,
-    a_[1] * _conv_x, b_[1] * _conv_x, -a * e_[1] * _conv_x);
-    printf("#	, %e*cos(t)+%e*sin(t)+%e, %e*cos(t)+%e*sin(t)+%e notitle with lines 2\\\n",
-    a_[0] * _conv_x, b_[0] * _conv_x, -a * e_[0] * _conv_x,
-    a_[2] * _conv_x, b_[2] * _conv_x, -a * e_[2] * _conv_x);
-    printf("#	, .001*cos(t)+%e, .001*sin(t)+%e notitle with lines 2\\\n",
-    r_[0] * _conv_x, r_[1] * _conv_x);
-    printf("#	, .001*cos(t)+%e, .001*sin(t)+%e notitle with lines 2\\\n",
-    r_[0] * _conv_x, r_[2] * _conv_x);
-  */
     _exit_function();
 }
 
