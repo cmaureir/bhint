@@ -12,9 +12,7 @@
 #include "bhi.h"
 
 #define CLOSE_MAX     100          // (initial) maximum number of neighbours; is increased dynamically
-//#define DT_AARSETH_ALL
 #define WARN_ENERGY_FACT .2
-//#define WARN_ENERGYALL
 #define MAX_REDUCECOUNT 3
 
 #define NO_USE_MASS_SUM
@@ -36,7 +34,6 @@ struct t_forceterm {
     double a[3], a_[3];
 };
 struct t_forceterm forceterm[N_MAX];
-struct t_forceterm forcesum[N_MAX];
 
 struct t_close {
     struct particle *p, *pk;
@@ -223,25 +220,25 @@ void add_collision(struct particle *p, struct particle *pk)
             _exit_function();
             return;
         }
-        if(collisions + 1 > max_collisions)
-        {
-            max_collisions += 10;
-            coll_vector = (struct particle ***)realloc(coll_vector, max_collisions*sizeof(struct particle **));
-            for(co = max_collisions - 10; co < max_collisions; co++)
-                coll_vector[co] = (struct particle **)malloc(2*sizeof(struct particle *));
-        }
-        if(p->m < pk->m)
-        {
-            coll_vector[collisions][0] = p;
-            coll_vector[collisions][1] = pk;
-        }
-        else
-        {
-            coll_vector[collisions][0] = pk;
-            coll_vector[collisions][1] = p;
-        }
-        collisions++;
-        _exit_function();
+    if(collisions + 1 > max_collisions)
+    {
+        max_collisions += 10;
+        coll_vector = (struct particle ***)realloc(coll_vector, max_collisions*sizeof(struct particle **));
+        for(co = max_collisions - 10; co < max_collisions; co++)
+            coll_vector[co] = (struct particle **)malloc(2*sizeof(struct particle *));
+    }
+    if(p->m < pk->m)
+    {
+        coll_vector[collisions][0] = p;
+        coll_vector[collisions][1] = pk;
+    }
+    else
+    {
+        coll_vector[collisions][0] = pk;
+        coll_vector[collisions][1] = p;
+    }
+    collisions++;
+    _exit_function();
 }
 // END
 // add_collision
@@ -258,13 +255,6 @@ void check_app(struct particle *parts, int pcount, double t)
     {
         if(close_list[j].p == NULL || close_list[j].p - parts >= pcount || close_list[j].pk - parts >= pcount )
             continue;
-        #ifdef PRINT_2
-        if(close_list[j].p == parts + PRINT_2 || close_list[j].pk == parts + PRINT_2)
-            fprintf(get_file(FILE_DEBUG), "# [%1.8e] # # # CLOSE-CHECK : %d - %d\n",
-                    t_total(t),
-                    close_list[j].p->name,
-                    close_list[j].p->name);
-        #endif
         collision = check_fast_approaches(parts, close_list[j].p, close_list[j].pk);
         if(collision && close_list[j].pk->active)
             add_collision(close_list[j].p, close_list[j].pk);
@@ -297,58 +287,6 @@ void correct_timestep(struct particle *parts, int pcount, double tmin)
         }
 
         p->dt = normalize_dt(p->t, p->dt);
-
-        #ifdef PRINT_1
-        if(p - parts == PRINT_1 || p - parts == PRINT_2)
-        {
-            for(i = 0; i < DIMENSIONS; i++)
-                r_temp[i] =  p->x[i] - parts[PRINT_2 + PRINT_1 - (p - parts)].x[i]
-                                + p->dt * (p->v[i] - parts[PRINT_2 + PRINT_1 - (p - parts)].v[i]
-                                + p->dt * (p->ha[i] + p->a[i]
-                                - parts[PRINT_2 + PRINT_1 - (p - parts)].ha[i]
-                                - parts[PRINT_2 + PRINT_1 - (p - parts)].a[i]
-                                + p->dt * (p->ha_[i] + p->a_[i]
-                                - parts[PRINT_2 + PRINT_1 - (p - parts)].ha_[i]
-                                - parts[PRINT_2 + PRINT_1 - (p - parts)].a_[i])));
-            fprintf(get_file(FILE_WARNING),
-                    "####  $$$$$   [t=%1.12e] time step %1.2e for approach of m%d and m%d (r0=%1.2e, r1=%1.2e)\n",
-                    t_total(p->t),
-                    convert_time(p->dt, 0),
-                    p - parts, PRINT_1 + PRINT_2 - (p - parts),
-                    convert_length(v_dist(p->x, parts[PRINT_1 + PRINT_2 - (p - parts)].x, 1), 0),
-                    convert_length(v_abs(r_temp), 0));
-            printf("#m%d\tt=%e\tx=( %1.4e %1.4e %1.4e )\t|v|=%1.2e\tr=%1.2e\tdt=%1.3e\thdt=%1.3e\tE1=%1.7e\tE=%1.7e\n",
-                    p->name,
-                    t_total(p->t),
-                    convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
-                    v_abs(p->v),
-                    convert_length(sqrt((  parts[PRINT_1].x[0]-parts[PRINT_2].x[0])
-                         * (parts[PRINT_1].x[0]-parts[PRINT_2].x[0])
-                         + (parts[PRINT_1].x[1]-parts[PRINT_2].x[1])
-                         * (parts[PRINT_1].x[1]-parts[PRINT_2].x[1])
-                         + (parts[PRINT_1].x[2]-parts[PRINT_2].x[2])
-                         * (parts[PRINT_1].x[2]-parts[PRINT_2].x[2])), 0),
-                    convert_time(p->dt, 0),
-                    convert_time(p->hdt, 0),
-                    get_energy(parts, pcount, p - parts),
-                    get_energy(parts, pcount, PRINT_1) + get_energy(parts, pcount, PRINT_2));
-            printf("#\t|a|=%1.2e\t|a_|=%1.2e\t|ha|=%1.2e\t|ha_|=%1.2e\ta/a_=%1.2e\tha/ha_=%1.2e\tm=%1.2e\n",
-                    v_abs(p->a), v_abs(p->a_),
-                    v_abs(p->ha), v_abs(p->ha_),
-                    sqrt(v_abs(p->a) / v_abs(p->a_)),
-                    sqrt(v_abs(p->ha) / v_abs(p->ha_)),
-                    p->m);
-            printf("[[%e]]\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n",
-                    t_total(p->t),
-                    convert_length(parts[PRINT_1].x[0], 0),  convert_length(parts[PRINT_1].x[1], 0),  convert_length(parts[PRINT_1].x[2], 0),
-                    convert_length(parts[PRINT_2].x[0], 0),  convert_length(parts[PRINT_2].x[1], 0),  convert_length(parts[PRINT_2].x[2], 0),
-                    convert_length(parts[PRINT_1].xp[0], 0), convert_length(parts[PRINT_1].xp[1], 0), convert_length(parts[PRINT_1].xp[2], 0),
-                    convert_length(parts[PRINT_2].xp[0], 0), convert_length(parts[PRINT_2].xp[1], 0), convert_length(parts[PRINT_2].xp[2], 0));
-            printf("#         %e\n", 1. / v_dist(parts[PRINT_1].x, parts[PRINT_2].x, 2));
-            printf("# CORRECT %5d:\t|x|=%e\t|v|=%e\n", p - parts, convert_length(v_abs(p->x), 0), v_abs(p->v));
-        }
-        fflush(stdout);
-        #endif
 
         register_dt(active[j], p->dt);
     }
@@ -563,32 +501,12 @@ void find_timesteps(struct particle *parts, int pcount, double tmin, double eta,
 {
     _enter_function(_UL_HERMITE2, _UL_HERMITE2_FIND_TIMESTEPS);
     double dt, dtn;
-    #ifdef DT_AARSETH_ALL
-    double a, a_, a_2, a_3;
-    #endif
     struct particle *p;
     int j, exp_;
 
     for(j = 0; j < movecount; j++)
     {
         p = parts + active[j];
-
-        #ifdef DT_AARSETH_ALL
-        a = sqrt((p->a[0] + p->ha[0]) * (p->a[0] + p->ha[0])
-               + (p->a[1] + p->ha[1]) * (p->a[1] + p->ha[1])
-               + (p->a[2] + p->ha[2]) * (p->a[2] + p->ha[2]));
-        a_ = sqrt((p->a_[0] + p->ha_[0]) * (p->a_[0] + p->ha_[0])
-               + (p->a_[1] + p->ha_[1]) * (p->a_[1] + p->ha_[1])
-               + (p->a_[2] + p->ha_[2]) * (p->a_[2] + p->ha_[2]));
-        a_2 = sqrt((p->a_2[0] + p->ha_2[0]) * (p->a_2[0] + p->ha_2[0])
-               + (p->a_2[1] + p->ha_2[1]) * (p->a_2[1] + p->ha_2[1])
-               + (p->a_2[2] + p->ha_2[2]) * (p->a_2[2] + p->ha_2[2]));
-        a_3 = sqrt((p->a_3[0] + p->ha_3[0]) * (p->a_3[0] + p->ha_3[0])
-               + (p->a_3[1] + p->ha_3[1]) * (p->a_3[1] + p->ha_3[1])
-               + (p->a_3[2] + p->ha_3[2]) * (p->a_3[2] + p->ha_3[2]));
-        dt = sqrt(eta * (a * a_2 + a_ * a_) / (a_ * a_3 + a_2 * a_2));
-
-        #else // NOT DT_AARSETH_ALL
 
         dt = get_timestep_aarseth(p->a, p->a_, p->a_2, p->a_3, eta);
         // don't let perturbation timestep get bigger than ETA_FACT * central timestep
@@ -598,7 +516,6 @@ void find_timesteps(struct particle *parts, int pcount, double tmin, double eta,
 
         if(dtn < dt)
             dt = dtn;
-        #endif // NOT DT_AARSETH_ALL
 
         // allow timestep to double at maximum
         if(p->dtnext < dt)
@@ -801,20 +718,6 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
         else if(r_2 < r_vic_2 && v_x_ < 0)
             add_close(parts, p, pk);
 
-        #ifdef PRINT_1
-        if(perturb)
-            if((p->name == PRINT_1 && pk->name == PRINT_2)
-                || (pk->name == PRINT_1 && p->name == PRINT_2))
-                    printf("# [t=%1.8e][%1.2e] PARTICLES  m%d / m%d :\ta=%e\t1/r²=%e\tr=%e\tr_vic=%e\n",
-                        t_total(p->t),
-                        convert_time(p->dt, 0),
-                        p->name, pk->name,
-                        afact * sqrt(r_2),
-                        convert_length(convert_length(afact / pk->m * sqrt(r_2), 1), 1),
-                        convert_length(sqrt(r_2), 0),
-                        convert_length(sqrt(r_vic_2), 0)
-                        );
-        #endif
         a0  += afact * x_0;
         a_0 += afact * (v_0 - v_x_ * x_0);
         a1  += afact * x_1;
@@ -1087,71 +990,71 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
                 break; // only one collision per particle allowed
             }
 
-            if(remove)
-            {
+        if(remove)
+        {
                 remove_part[removecount++] = active[j];
                 active[j] = -1;
-            }
         }
+    }
 
-        if(removecount)
+    if(removecount)
+    {
+        for(j = 0; j < removecount; j++)
         {
-            for(j = 0; j < removecount; j++)
-            {
-                lose_energy(parts[remove_part[j]].energy);
-                fprintf(get_file(FILE_WARNING),
-                    "#### [t=%1.12e] removing particle m%d at %d of %d loses energy %e\n",
+            lose_energy(parts[remove_part[j]].energy);
+            fprintf(get_file(FILE_WARNING),
+                   "#### [t=%1.12e] removing particle m%d at %d of %d loses energy %e\n",
                     t_total(tmin), parts[remove_part[j]].name, remove_part[j], *pcount, parts[remove_part[j]].energy);
-                if(remove_part[j] < --(*pcount))
-                {
-                    memcpy(parts + remove_part[j], parts + *pcount, sizeof(struct particle));
-                    fprintf(get_file(FILE_WARNING),
-                    "#### [t=%1.12e] particle at %d replaced by m%d\n",
-                    t_total(tmin), remove_part[j], parts[remove_part[j]].name);
-                }
-                node_posmax--;
-                fflush(get_file(FILE_WARNING));
-                for(k = 0; k < close_n; k++)
-                    if(close_list[k].p == parts + remove_part[j] || close_list[k].pk == parts + remove_part[j])
-                        close_list[k].p = close_list[k].pk = NULL;
-            }
-
-            if(re_evaluate)
+            if(remove_part[j] < --(*pcount))
             {
+                memcpy(parts + remove_part[j], parts + *pcount, sizeof(struct particle));
                 fprintf(get_file(FILE_WARNING),
-                    "#### [t=%1.12e] Need to re-evaluate %d moved particles.\n",
-                        t_total(tmin), movecount);
-                for(j = 0; j < movecount; j++)
-                    if(active[j] > 0 && active[j] < *pcount)
-                    {
-                        evaluate_1_2(parts, *pcount, active[j], 0, 0, parts[active[j]].ha, parts[active[j]].ha_);
-                        evaluate_1_2(parts, *pcount, active[j], 1, *pcount - 1, parts[active[j]].a, parts[active[j]].a_);
-                    }
-
-                check_app(parts, *pcount, .0);
+                "#### [t=%1.12e] particle at %d replaced by m%d\n",
+                t_total(tmin), remove_part[j], parts[remove_part[j]].name);
             }
-            else
-                fprintf(get_file(FILE_WARNING),
-                    "#### [t=%1.12e] No need to re-evaluate %d moved particles.\n",
-                    t_total(tmin), movecount);
+            node_posmax--;
             fflush(get_file(FILE_WARNING));
-
-            init_dt(parts, *pcount, 1);
-            fprintf(get_file(FILE_WARNING), "### NEW NUMBER OF PARTICLES: %d\n", *pcount);
-            fflush(get_file(FILE_WARNING));
+            for(k = 0; k < close_n; k++)
+                if(close_list[k].p == parts + remove_part[j] || close_list[k].pk == parts + remove_part[j])
+                    close_list[k].p = close_list[k].pk = NULL;
         }
 
-        T_END;
+        if(re_evaluate)
+        {
+            fprintf(get_file(FILE_WARNING),
+                "#### [t=%1.12e] Need to re-evaluate %d moved particles.\n",
+                    t_total(tmin), movecount);
+            for(j = 0; j < movecount; j++)
+                if(active[j] > 0 && active[j] < *pcount)
+                {
+                    evaluate_1_2(parts, *pcount, active[j], 0, 0, parts[active[j]].ha, parts[active[j]].ha_);
+                    evaluate_1_2(parts, *pcount, active[j], 1, *pcount - 1, parts[active[j]].a, parts[active[j]].a_);
+                }
 
-        move_center(parts, *pcount, tmin);
-        parts->v[0] = parts->v[1] = parts->v[2] = 0;
-        parts->x[0] = parts->x[1] = parts->x[2] = 0;
-        parts->vp[0] = parts->vp[1] = parts->vp[2] = 0;
-        parts->xp[0] = parts->xp[1] = parts->xp[2] = 0;
-        parts->t = tmin;
+            check_app(parts, *pcount, .0);
+        }
+        else
+            fprintf(get_file(FILE_WARNING),
+               "#### [t=%1.12e] No need to re-evaluate %d moved particles.\n",
+               t_total(tmin), movecount);
+        fflush(get_file(FILE_WARNING));
 
-        _exit_function();
-        return movecount;
+        init_dt(parts, *pcount, 1);
+        fprintf(get_file(FILE_WARNING), "### NEW NUMBER OF PARTICLES: %d\n", *pcount);
+        fflush(get_file(FILE_WARNING));
+    }
+
+    T_END;
+
+    move_center(parts, *pcount, tmin);
+    parts->v[0] = parts->v[1] = parts->v[2] = 0;
+    parts->x[0] = parts->x[1] = parts->x[2] = 0;
+    parts->vp[0] = parts->vp[1] = parts->vp[2] = 0;
+    parts->xp[0] = parts->xp[1] = parts->xp[2] = 0;
+    parts->t = tmin;
+
+    _exit_function();
+    return movecount;
 }
 // END
 // step_hermite_2
