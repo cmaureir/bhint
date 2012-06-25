@@ -124,35 +124,6 @@ double get_ekin(struct particle parts[], int pcount, int pred)
 
 
 /*
- * Return acceleration for specified particle _pos_ as F/m.
- */
-void get_acc(struct particle parts[], int pcount, int pos, double acc[3])
-{
-    _enter_function(_UL_NBODY, _UL_NBODY_GET_ACC);
-    int i;
-    double dist3;
-    struct particle *p=parts+pos, *p2;
-
-    acc[0] = 0.0;
-    acc[1] = 0.0;
-    acc[2] = 0.0;
-
-    for(p2 = parts; p2 < parts + pcount; p2++)
-    {
-        if(p2 == p)
-        {
-            continue;
-        }
-        dist3 = v_dist(p2->x, p->x, 3);
-        for(i = 0; i < DIMENSIONS; i++)
-        {
-            acc[i] -= p2->m / dist3 * (p->x[i] - p2->x[i]);
-        }
-    }
-    _exit_function();
-}
-
-/*
  * Return total potential energy U of the system.
  */
 double get_epot(struct particle parts[], int pcount, int pred)
@@ -425,7 +396,7 @@ void integrate( struct particle parts[], int pcount,
         for(j = 0; j < pcount; j++)
             m_tot += parts[j].m;
 
-        get_reduced(parts, 1, &orig_e, &orig_a, &orig_t, &orig_j);//red_, red_+1, red_+2, red_+3);
+        get_reduced(parts, 1, &orig_e, &orig_a, &orig_t, &orig_j);
         t_max = (orbits >= 0) ? (double)orbits * orig_t : -orbits;
 
         for(j = 1; j < pcount; j++)
@@ -483,16 +454,12 @@ void integrate( struct particle parts[], int pcount,
         printed = 0;
         // integration step
         t_old = parts[1].t + t_over;
-        switch(method)
+        if (method == 'i')
         {
-            case 'i':
                 steps = step_hermite_2(parts, &pcount, ETA, MIN_EVALS, &t_eval);
-                break;
         }
         add_over(steps, &count_steps, &count_steps_over);
         #ifdef INIT_TIME
-        /*       if(steps >= pcount-1) */
-        /* 	printf("%d\t%ld\t%e\t%e\n", init_phase, steps, parts[1].t + t_over, INIT_TIME); */
         if(init_phase && (steps == pcount-1) && (parts[1].t + t_over >= INIT_TIME))
         {
             re_init(parts, pcount);
@@ -504,13 +471,13 @@ void integrate( struct particle parts[], int pcount,
         {
             // count apocenter passage
             predict(parts, pcount, parts[1].t);
-            rv_ = (parts[1].xp[0]-parts[0].xp[0])*(parts[1].vp[0]-parts[0].vp[0])
+
+            rv_ =     (parts[1].xp[0]-parts[0].xp[0])*(parts[1].vp[0]-parts[0].vp[0])
                     + (parts[1].xp[1]-parts[0].xp[1])*(parts[1].vp[1]-parts[0].vp[1])
                     + (parts[1].xp[2]-parts[0].xp[2])*(parts[1].vp[2]-parts[0].vp[2]);
             if(rv_ != 0 && rv != 0)
             {
                 if(rv_ < 0 && rv > 0) // 1st particle at apocenter
-                //if(rv_ > 0 && rv < 0) // 1st particle at pericenter
                 {
                     if(t_steps < 0)
                     {
