@@ -1,9 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
+#include <cmath>
 #include <assert.h>
 #include "bhi_config.h"
+#include <iostream>
+#include <iomanip>
+#include <limits>
+#include <omp.h>
 
 #ifdef  USE_M_ENCL
 #define M_ENCL_IO(r) M_ENCL(r)

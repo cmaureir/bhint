@@ -383,7 +383,7 @@ void integrate( struct particle parts[], int pcount,
 
         //PARTICLES
         fscanf(dumpfile, "%*s%*c");
-        assert(pcount == fread(parts, sizeof(struct particle), pcount, dumpfile));
+        assert(pcount == (int)fread(parts, sizeof(struct particle), pcount, dumpfile));
 
         for(p = parts; p < parts + pcount; p++)
             if(p > parts && p->m > _m_max
@@ -663,11 +663,11 @@ int main(int argc, char **argv)
     FILE *infile=NULL;
     double t_=t_maxval+DT_TOLERANCE*.5;
 
-    signal(SIGINT, sigproc);
-    signal(SIGQUIT, sigproc);
-    signal(SIGTERM, sigproc);
-    signal(SIGUSR1, sigproc);
-    signal(SIGUSR2, sigproc);
+    //signal(SIGINT, sigproc);
+    //signal(SIGQUIT, sigproc);
+    //signal(SIGTERM, sigproc);
+    //signal(SIGUSR1, sigproc);
+    //signal(SIGUSR2, sigproc);
     //signal(SIGSEGV, sigproc);
 
     while(t_ > t_maxval)

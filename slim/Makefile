@@ -3,14 +3,11 @@
 # + U. Loeckmann                               +
 # +--------------------------------------------+
 
-LIBS=
 CFLAGS=-Wall -O3 -pg -fopenmp
-CC=gcc
-CC_FORTRAN=gcc
-GET=co
+CC=g++
 OBJS=bhi_int.o  bhi_io.o  bhi_kepler.o bhi_timestep.o  bhi_util.o  bhi_vector.o
 DEPEND= makedepend $(CFLAGS)
-LDFLAGS=-L . -L /opt/SUNWhpc/lib $(G2C) $(LIBS) -lm -pg -fopenmp
+LDFLAGS=-L . -lm -pg -fopenmp
 
 
 all: bhint
@@ -30,5 +27,5 @@ cleanall: clean
 # To make an executable
 
 bhint: $(OBJS) bhi_main.o
-	$(CC_FORTRAN) -o bhint $(OBJS) bhi_main.o $(LDFLAGS2) $(LDFLAGS)
+	$(CC) -o bhint $(OBJS) bhi_main.o $(LDFLAGS)
 
