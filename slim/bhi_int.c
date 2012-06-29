@@ -871,7 +871,7 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     //}
     //else
     //{
-        iteration_gpu(parts, pcount, pos, posmin,posmax, p,
+        iteration_cpu(parts, pcount, pos, posmin,posmax, p,
                       px, pv,
                       &a0, &a1, &a2, &a_0, &a_1, &a_2, r_vic_2, &phi,
                       maxforce, r_perturb_2, r1_2, perturb, rs_2,
