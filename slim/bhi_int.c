@@ -581,6 +581,157 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
 // END
 // herm_pred
 //
+
+
+__global__ void foo()
+{
+
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+
+    nearest[0] = p->nearestneighbour;
+
+
+    //for(i = posmin; i <= posmax; i++)
+
+    close_array[i-posmin] = 0;
+    if(i == pos)
+        continue;
+
+    x_0 = parts[i].xp[0] - px[0];
+    x_1 = parts[i].xp[1] - px[1];
+    x_2 = parts[i].xp[2] - px[2];
+    v_0 = parts[i].vp[0] - pv[0];
+    v_1 = parts[i].vp[1] - pv[1];
+    v_2 = parts[i].vp[2] - pv[2];
+
+    r_2 = x_0*x_0 + x_1*x_1 + x_2*x_2;
+
+    io_close[i-posmin] = p->io_close_warn;
+    nearest[i-posmin] = p->nearestneighbour;
+
+    if(r_2 < min_r2)
+    {
+        nearest[i-posmin] = i;
+        min_r2 = r_2;
+    }
+    else if (i-posmin > 0)
+    {
+        if (i-1 == pos)
+            nearest[i-posmin] = nearest[i-posmin-2];
+        else
+            nearest[i-posmin] = nearest[i-posmin-1];
+    }
+
+    _1_over_r2 = 1. / r_2;
+    afact_[i-posmin] = parts[i].m * _1_over_r2;
+
+    afact[i-posmin] = afact_[i-posmin] * sqrt(_1_over_r2);
+    v_x_ = 3. * _1_over_r2 * (x_0*v_0 + x_1*v_1 + x_2*v_2);
+
+    // TO DO: Divergence
+    if(perturb)
+        if(
+            ((r_2 < r_perturb_2) &&
+            (parts[i].m * r1_2 > PERTURBING_FORCE_RATIO * parts[0].m * r_2))
+        )
+        {
+            if(io_close[i-posmin] <= 0 || io_close[i-posmin] > 16 * r_2)
+            {
+                io_close[i-posmin] = r_2;
+            }
+            *new_close_warn = 1;
+            energy[i-posmin] = get_energy(parts, pcount, pos);
+        }
+
+    if((r_2<rs_2)&&(r_2<9.*C_2G_C2*C_2G_C2*(p->m + parts[i].m)*(p->m + parts[i].m)))
+    {
+        // collision in 3 Schwarzschild-radii
+        close_array[i-posmin] = 1;
+    }
+    else if(r_2 < r_vic_2 && v_x_ < 0)
+    {
+        // find approaching particles in vicinity
+        close_array[i-posmin] = 1;
+    }
+
+    *a0  += afact[i-posmin] * x_0;
+    *a_0 += afact[i-posmin] * (v_0 - v_x_ * x_0);
+    *a1  += afact[i-posmin] * x_1;
+    *a_1 += afact[i-posmin] * (v_1 - v_x_ * x_1);
+    *a2  += afact[i-posmin] * x_2;
+    *a_2 += afact[i-posmin] * (v_2 - v_x_ * x_2);
+    *phi -= afact[i-posmin] * r_2;
+
+    //
+
+}
+
+
+void iteration_gpu2(struct particle parts[],int pcount, int pos, int posmin, int posmax,
+                    struct particle *p, double *px, double *pv,
+                    double *a0, double *a1, double *a2, double *a_0,
+                    double *a_1, double *a_2, double r_vic_2, double *phi,
+                    double maxforce, double r_perturb_2, double r1_2,
+                    double perturb, double rs_2, int *new_close_warn)
+{
+    double x_0, x_1, x_2, v_0, v_1, v_2;
+    double min_r2 = 1.e99;
+    double v_x_;
+    double r_2 = .0;
+    double _1_over_r2;
+
+    int n = posmax - posmin;
+
+    double afact[n];
+    double afact_[n];
+    double io_close[n];
+    int close_array[n];
+    int nearest[n];
+    int energy[n];
+
+    // Necessary copy data:
+    // p, px, pv, a0, a1, a2, a_0, a_1, a_2, phi, new_close_warn
+    // afact[], afact_[], io_close[], close_array[], nearest[], energy[]
+    //
+    //                   arrays + px/pv + a* + phi + new_close_warn + p
+    // Total data size = [n * (3 * 8 + 3 * 4)] + [3 * 2 * 8] + [6 * 8] + 8 + 4 +
+    //                   [8 * (3 * 24) + 8 * 37 + 4 * 10]
+    //
+    // Total = n * 36 + 1020
+    // 1000 bodies = 36 Mbytes
+
+    struct particle *d_p;
+
+
+    int nthreads = 256;
+    int nblocks = ceil(n/(float)nthreads);
+
+    foo <<< nblocks, nthreads >>> ();
+
+
+    for(i = posmin; i <= posmax; i++)
+    {
+        if(i == pos)
+            continue;
+        p->nearestneighbour = nearest[i-posmin];
+        if(io_close[i-posmin] != 0)
+            p->io_close_warn = io_close[i-posmin];
+        if(energy[i-posmin] != 0 )
+        {
+            p->energy = energy[i-posmin];
+        }
+        if(close_array[i-posmin] == 1)
+        {
+            add_close(p, &parts[i]);
+        }
+        if(maxforce < .0 || afact_[i-posmin] > maxforce)
+            maxforce = afact_[i-posmin];
+    }
+
+}
+
+
+
 void iteration_gpu(struct particle parts[],int pcount, int pos, int posmin, int posmax,
                     struct particle *p, double *px, double *pv,
                     double *a0, double *a1, double *a2, double *a_0,
@@ -599,7 +750,7 @@ void iteration_gpu(struct particle parts[],int pcount, int pos, int posmin, int 
     double io_close[posmax-posmin];
     int close_array[posmax-posmin];
     int nearest[posmax-posmin];
-    int  energy[posmax-posmin];
+    int energy[posmax-posmin];
 
     nearest[0] = p->nearestneighbour;
     for(i = posmin; i <= posmax; i++)
@@ -634,8 +785,6 @@ void iteration_gpu(struct particle parts[],int pcount, int pos, int posmin, int 
                 nearest[i-posmin] = nearest[i-posmin-1];
         }
 
-        //printf("a: %d\t%.10f\t%.10f\n", nearest[i-posmin], r_2, min_r2);
-
         _1_over_r2 = 1. / r_2;
         afact_[i-posmin] = parts[i].m * _1_over_r2;
 
@@ -654,21 +803,18 @@ void iteration_gpu(struct particle parts[],int pcount, int pos, int posmin, int 
                     io_close[i-posmin] = r_2;
                 }
                 *new_close_warn = 1;
-                energy[i-posmin] = 1;
-                //p->energy = get_energy(parts, pcount, pos);
+                energy[i-posmin] = get_energy(parts, pcount, pos);
             }
 
         if((r_2<rs_2)&&(r_2<9.*C_2G_C2*C_2G_C2*(p->m + parts[i].m)*(p->m + parts[i].m)))
         {
             // collision in 3 Schwarzschild-radii
             close_array[i-posmin] = 1;
-            //add_close(p, &parts[i]);
         }
         else if(r_2 < r_vic_2 && v_x_ < 0)
         {
             // find approaching particles in vicinity
             close_array[i-posmin] = 1;
-            //add_close(p, &parts[i]);
         }
 
         *a0  += afact[i-posmin] * x_0;
@@ -679,8 +825,6 @@ void iteration_gpu(struct particle parts[],int pcount, int pos, int posmin, int 
         *a_2 += afact[i-posmin] * (v_2 - v_x_ * x_2);
         *phi -= afact[i-posmin] * r_2;
 
-        //printf("%d/%d\t%d\n", i-posmin, (posmax-posmin), nearest[i-posmin]);
-
     }
 
     for(i = posmin; i <= posmax; i++)
@@ -690,9 +834,9 @@ void iteration_gpu(struct particle parts[],int pcount, int pos, int posmin, int 
         p->nearestneighbour = nearest[i-posmin];
         if(io_close[i-posmin] != 0)
             p->io_close_warn = io_close[i-posmin];
-        if(energy[i-posmin] == 1)
+        if(energy[i-posmin] != 0 )
         {
-            p->energy = get_energy(parts, pcount, pos);
+            p->energy = energy[i-posmin];
         }
         if(close_array[i-posmin] == 1)
         {
@@ -871,7 +1015,7 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     //}
     //else
     //{
-        iteration_cpu(parts, pcount, pos, posmin,posmax, p,
+        iteration_gpu(parts, pcount, pos, posmin,posmax, p,
                       px, pv,
                       &a0, &a1, &a2, &a_0, &a_1, &a_2, r_vic_2, &phi,
                       maxforce, r_perturb_2, r1_2, perturb, rs_2,
