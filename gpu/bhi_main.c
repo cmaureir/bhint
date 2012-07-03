@@ -624,7 +624,7 @@ int main(int argc, char **argv)
     _enter_function(_UL_NBODY, _UL_NBODY_MAIN);
     double t_steps=0.0;
     struct particle *parts[1];
-    char mode='s', *infile_name="", *outfile_name=(char*)malloc(300), method='u', *c;
+    char mode='s', *infile_name = (char*)"", *outfile_name=(char*)malloc(300), method='u', *c;
     double orbits=10;
     int pcount=0, i;
     FILE *infile=NULL;

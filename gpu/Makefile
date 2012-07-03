@@ -28,7 +28,7 @@ cleanall: clean
 	make -C clean
 
 bhi_int.o: bhi_int.cu
-	$(NVCC) -c $^
+	$(NVCC) -Xptxas -v -c $^ -arch sm_13
 
 %.o: %.c bhi.h bhi_config.h
 	$(CC) $(CFLAGS) -c $*.c
