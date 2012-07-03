@@ -64,6 +64,273 @@ enum _function {_UL_HERMITE2_REGISTER_DT=0, _UL_HERMITE2_INIT_DT, _UL_HERMITE2_P
                 _G6_SET_TI, _G6_CALC_FIRSTHALF, _G6_CALC_LASTHALF, _G6_READ_NEIGHBOUR_LIST,
                 _G6_GET_NEIGHBOUR_LIST, _UL_HERMITE2_ADD_FORCE_EXTPOT};
 
+// CUDA global variables
+// new_close_warn
+struct particle *d_p;
+double *d_x, *d_v;
+double *d_px, *d_pv;
+double *d_a0, *d_a1, *d_a2, *d_a_0, *d_a_1, *d_a_2, *d_phi;
+double *h_a0, *h_a1, *h_a2, *h_a_0, *h_a_1, *h_a_2, *h_phi;
+double *d_afact, *d_afact_, *d_io_close;
+int *d_close, *d_nearest, *d_energy;
+// Maybe, bank conflict
+int *d_new_close_warn;
+
+//
+// add_close
+//
+void add_close(struct particle *p, struct particle *pk)
+{
+    //printf("%d\t%d\n", p->name, pk->name);
+    _enter_function(_UL_HERMITE2, _UL_HERMITE2_ADD_CLOSE);
+    if(close_list == NULL)
+        close_list = (struct t_close *)malloc(CLOSE_MAX * sizeof(struct t_close));
+    assert(p != pk);
+    if(close_n >= close_max)
+    {
+        struct t_close *close_2 = (struct t_close *)realloc(close_list, 2*close_max * sizeof(struct t_close));
+        if(close_2 == NULL)
+        {
+            fprintf(get_file(FILE_WARNING), "#### MEMORY ERROR (%d): Ignoring close encounter m%d and m%d ####\n",
+                    close_max,
+                    p->name, pk->name);
+                    fflush(get_file(FILE_WARNING));
+            _exit_function();
+            return;
+        }
+        //printf("!!! %d\n", close_max);
+        if(close_list != close_2)
+            close_list = close_2;
+       close_max *= 2;
+    }
+    close_list[close_n].p = p;
+    close_list[close_n++].pk = pk;
+    _exit_function();
+}
+// END
+// add_close
+
+void iteration_split(struct particle parts[],int pcount, int pos, int posmin, int posmax,
+                    struct particle *p, double *px, double *pv,
+                    double *a0, double *a1, double *a2, double *a_0,
+                    double *a_1, double *a_2, double r_vic_2, double *phi,
+                    double maxforce, double r_perturb_2, double r1_2,
+                    double perturb, double rs_2, int *new_close_warn)
+{
+    double x_0, x_1, x_2, v_0, v_1, v_2;
+    double min_r2 = 1.e99;
+    double v_x_;
+    double r_2 = .0;
+    double _1_over_r2;
+    int i;
+    double afact[posmax-posmin];
+    double afact_[posmax-posmin];
+    double io_close[posmax-posmin];
+    int close[posmax-posmin];
+    int nearest[posmax-posmin];
+    int energy[posmax-posmin];
+
+    nearest[0] = p->nearestneighbour;
+    for(i = posmin; i <= posmax; i++)
+    {
+
+        close[i-posmin] = 0;
+        if(i == pos)
+            continue;
+
+        x_0 = parts[i].xp[0] - px[0];
+        x_1 = parts[i].xp[1] - px[1];
+        x_2 = parts[i].xp[2] - px[2];
+        v_0 = parts[i].vp[0] - pv[0];
+        v_1 = parts[i].vp[1] - pv[1];
+        v_2 = parts[i].vp[2] - pv[2];
+
+        r_2 = x_0*x_0 + x_1*x_1 + x_2*x_2;
+
+        io_close[i-posmin] = p->io_close_warn;
+        nearest[i-posmin] = p->nearestneighbour;
+
+        if(r_2 < min_r2)
+        {
+            nearest[i-posmin] = i;
+            min_r2 = r_2;
+        }
+        else if (i-posmin > 0)
+        {
+            if (i-1 == pos)
+                nearest[i-posmin] = nearest[i-posmin-2];
+            else
+                nearest[i-posmin] = nearest[i-posmin-1];
+        }
+
+        _1_over_r2 = 1. / r_2;
+        afact_[i-posmin] = parts[i].m * _1_over_r2;
+
+        afact[i-posmin] = afact_[i-posmin] * sqrt(_1_over_r2);
+        v_x_ = 3. * _1_over_r2 * (x_0*v_0 + x_1*v_1 + x_2*v_2);
+
+        // TO DO: Divergence
+        if(perturb)
+            if(
+                ((r_2 < r_perturb_2) &&
+                (parts[i].m * r1_2 > PERTURBING_FORCE_RATIO * parts[0].m * r_2))
+            )
+            {
+                if(io_close[i-posmin] <= 0 || io_close[i-posmin] > 16 * r_2)
+                {
+                    io_close[i-posmin] = r_2;
+                }
+                *new_close_warn = 1;
+                energy[i-posmin] = get_energy(parts, pcount, pos);
+            }
+
+        if((r_2<rs_2)&&(r_2<9.*C_2G_C2*C_2G_C2*(p->m + parts[i].m)*(p->m + parts[i].m)))
+        {
+            // collision in 3 Schwarzschild-radii
+            close[i-posmin] = 1;
+        }
+        else if(r_2 < r_vic_2 && v_x_ < 0)
+        {
+            // find approaching particles in vicinity
+            close[i-posmin] = 1;
+        }
+
+        *a0  += afact[i-posmin] * x_0;
+        *a_0 += afact[i-posmin] * (v_0 - v_x_ * x_0);
+        *a1  += afact[i-posmin] * x_1;
+        *a_1 += afact[i-posmin] * (v_1 - v_x_ * x_1);
+        *a2  += afact[i-posmin] * x_2;
+        *a_2 += afact[i-posmin] * (v_2 - v_x_ * x_2);
+        *phi -= afact[i-posmin] * r_2;
+
+    }
+
+    for(i = posmin; i <= posmax; i++)
+    {
+        if(i == pos)
+            continue;
+        p->nearestneighbour = nearest[i-posmin];
+        if(io_close[i-posmin] != 0)
+            p->io_close_warn = io_close[i-posmin];
+        if(energy[i-posmin] != 0 )
+        {
+            p->energy = energy[i-posmin];
+        }
+        if(close[i-posmin] == 1)
+        {
+            add_close(p, &parts[i]);
+        }
+        if(maxforce < .0 || afact_[i-posmin] > maxforce)
+            maxforce = afact_[i-posmin];
+    }
+
+}
+
+
+
+void iteration_normal(struct particle parts[],int pcount, int pos, int posmin, int posmax,
+                    struct particle *p, double *px, double *pv,
+                    double *a0, double *a1, double *a2, double *a_0,
+                    double *a_1, double *a_2, double r_vic_2, double *phi,
+                    double maxforce, double r_perturb_2, double r1_2,
+                    double perturb, double rs_2, int *new_close_warn)
+{
+    double x_0, x_1, x_2, v_0, v_1, v_2;
+    double min_r2 = 1.e99;
+    double v_x_;
+    double r_2, afact;
+    double _1_over_r2;
+    int i;
+
+    for(i = posmin; i <= posmax; i++)
+    {
+        if(i == pos)
+            continue;
+        x_0 = parts[i].xp[0] - px[0]; v_0 = parts[i].vp[0] - pv[0];
+        x_1 = parts[i].xp[1] - px[1]; v_1 = parts[i].vp[1] - pv[1];
+        x_2 = parts[i].xp[2] - px[2]; v_2 = parts[i].vp[2] - pv[2];
+
+        r_2 = x_0*x_0 + x_1*x_1 + x_2*x_2; //scal_prod(x_, x_);
+
+        if(r_2 < min_r2)
+        {
+            p->nearestneighbour = i;
+            min_r2 = r_2;
+        }
+
+        _1_over_r2 = 1. / r_2;
+        afact = parts[i].m * _1_over_r2;
+        if(maxforce < .0 || afact > maxforce)
+            maxforce = afact;
+        afact *= sqrt(_1_over_r2);
+        v_x_ = 3. * _1_over_r2 * (x_0*v_0 + x_1*v_1 + x_2*v_2);
+
+        if(perturb)
+            if(
+                ((r_2 < r_perturb_2) &&
+                (parts[i].m * r1_2 > PERTURBING_FORCE_RATIO * parts[0].m * r_2))
+            )
+            {
+                if(p->io_close_warn <= 0 || p->io_close_warn > 16 * r_2)
+                {
+                    //fprintf(get_file(FILE_DEBUG),
+                    //        "#### [t=%1.12e] close encounter of m%d[%d] and m%d[%d]: %e (allowing %e, perturbing at %e) ####\n",
+                    //        t_total(p->t),
+                    //        p->name, pos,
+                    //        parts[i].name, i,
+                    //        convert_length(sqrt(r_2), 0),
+                    //        convert_length(C_2G_C2 * (parts[i].m + p->m), 0),
+                    //        convert_length(sqrt(parts[i].m / parts[0].m * scal_prod(px, px)), 0));
+                    //fprintf(get_file(FILE_DEBUG),
+                    //        " CE %1.12e\t%d\t%e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%d\t%e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\n",
+                    //        t_total(p->t),
+                    //        parts[i].name, convert_mass(parts[i].m, 0),
+                    //        convert_length(parts[i].xp[0], 0), convert_length(parts[i].xp[1], 0), convert_length(parts[i].xp[2], 0),
+                    //        convert_length(convert_time(parts[i].vp[0], 1), 0), convert_length(convert_time(parts[i].vp[1], 1), 0), convert_length(convert_time(parts[i].vp[2], 1), 0),
+                    //        p->name, convert_mass(p->m, 0),
+                    //        convert_length(px[0], 0), convert_length(px[1], 0), convert_length(px[2], 0),
+                    //        convert_length(convert_time(pv[0], 1), 0), convert_length(convert_time(pv[1], 1), 0), convert_length(convert_time(pv[2], 1), 0)
+                    //        );
+                    //fflush(get_file(FILE_DEBUG));
+                    p->io_close_warn = r_2;
+                }
+                *new_close_warn = 1;
+                p->energy = get_energy(parts, pcount, p - parts);
+            }
+        if(
+         (r_2 < rs_2) &&
+         // calculate exact for star mass rather than maximum
+         (r_2 < 9. * C_2G_C2 * C_2G_C2 * (p->m + parts[i].m) * (p->m + parts[i].m)))
+        {
+            // collision in 3 Schwarzschild-radii
+            //fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of m%d and m%d: %e (r_S = %e) ####\n",
+            //        t_total(p->t),
+            //        p->name,
+            //        parts[i].name,
+            //        convert_length(sqrt(r_2), 0),
+            //        convert_length(C_2G_C2 * (parts[i].m + p->m), 0));
+            //fflush(get_file(FILE_WARNING));
+            add_close(p, &parts[i]);
+        }
+
+        // find approaching particles in vicinity
+        else if(r_2 < r_vic_2 && v_x_ < 0)
+            add_close(p, &parts[i]);
+
+        *a0  += afact * x_0;
+        *a_0 += afact * (v_0 - v_x_ * x_0);
+        *a1  += afact * x_1;
+        *a_1 += afact * (v_1 - v_x_ * x_1);
+        *a2  += afact * x_2;
+        *a_2 += afact * (v_2 - v_x_ * x_2);
+        *phi -= afact * r_2;
+    }
+
+}
+
+
+
+
 //
 // register_dt
 //
@@ -79,7 +346,7 @@ void register_dt(int pos, double dt)
     if(step_alloc[n] <= step_count[n])
     {
         step_alloc[n] = floor(1.4 * (float)step_alloc[n]);
-        step_part[n] = realloc(step_part[n], step_alloc[n] * sizeof(int));
+        step_part[n] = (int*)realloc(step_part[n], step_alloc[n] * sizeof(int));
         assert(step_part[n] != NULL);
     }
 
@@ -153,7 +420,7 @@ void predict_part_hermite2(struct particle *p, double t)
 
     //**/fprintf("## predicting #%d by %e for t=%1.12e\n", p->name, dt, tmin);      fflush(stdout);
 
-    for(i = 0; i < DIMENSIONS; i++)
+   for(i = 0; i < DIMENSIONS; i++)
     {
         // orbital movement
         p->xp[i] = p->x[i] + (dt * p->v[i] ) + (dt2 * p->ha[i] ) + (dt3 * p->ha_[i]  )+ dt4 * p->ha_2[i] + (dt5 * p->ha_3[i]);
@@ -174,38 +441,6 @@ void predict_part_hermite2(struct particle *p, double t)
 // END
 // predict_part_hermite2
 
-//
-// add_close
-//
-void add_close(struct particle *parts, struct particle *p, struct particle *pk)
-{
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_ADD_CLOSE);
-    if(close_list == NULL)
-        close_list = (struct t_close *)malloc(CLOSE_MAX * sizeof(struct t_close));
-    assert(p != pk);
-    if(close_n >= close_max)
-    {
-        struct t_close *close_2 = (struct t_close *)realloc(close_list, 2*close_max * sizeof(struct t_close));
-        if(close_2 == NULL)
-        {
-            fprintf(get_file(FILE_WARNING), "#### MEMORY ERROR (%d): Ignoring close encounter m%d and m%d ####\n",
-                    close_max,
-                    p->name, pk->name);
-                    fflush(get_file(FILE_WARNING));
-            _exit_function();
-            return;
-        }
-        //printf("!!! %d\n", close_max);
-        if(close_list != close_2)
-            close_list = close_2;
-       close_max *= 2;
-    }
-    close_list[close_n].p = p;
-    close_list[close_n++].pk = pk;
-    _exit_function();
-}
-// END
-// add_close
 
 //
 // add_collision
@@ -579,9 +814,7 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
 }
 // END
 // herm_pred
-
-
-
+//
 
 //
 // evaluate_1_2
@@ -595,15 +828,11 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     _enter_function(_UL_HERMITE2, _UL_HERMITE2_EVALUATE_1);
     int new_close_warn = 0;
     int perturb = (posmax>0?1:0);
-    double r_2, afact, v_x_;
-    struct particle *p = parts+pos, *pk;
-    double *px = p->xp, *pv = p->vp, *pkx, *pkv;
-    double maxforce = -1.0, r_vic_2 = .0, r1_2 = scal_prod(px, px), _1_over_r2, rs_2, r_perturb_2;
+    struct particle *p = parts+pos;
+    double *px = p->xp, *pv = p->vp;
+    double maxforce = -1.0, r_vic_2 = .0, r1_2 = scal_prod(px, px), rs_2, r_perturb_2;
     double a0 = .0, a1=.0, a2=.0, a_0=.0, a_1=.0, a_2=.0;
-    double min_r2 = 1.e99;
     double phi = .0;
-    double x_0, x_1, x_2, v_0, v_1, v_2;
-    double px0=px[0], px1=px[1], px2=px[2], pv0=pv[0], pv1=pv[1], pv2=pv[2];
 
     // determine sphere of vicinity (close encounters possible within 2dt)
     if(perturb)
@@ -628,7 +857,7 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
     // evaluate forces
 
     // approaching SMBH??
-    if(px0*px0 + px1*px1 + px2*px2 < 9. * C_2G_C2 * C_2G_C2 * (p->m + parts->m) * (p->m + parts->m))
+    if(px[0]*px[0] + px[1]*px[1] + px[2]*px[2] < 9. * C_2G_C2 * C_2G_C2 * (p->m + parts->m) * (p->m + parts->m))
     {
         // collision in 3 Schwarzschild-radii
         fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of SMBH m0 and m%d: %e (r_S = %e) ####\n",
@@ -640,100 +869,28 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
         add_collision(p, parts);
     }
 
-    // FOR
-    for(pk = parts + posmin; pk <= parts + posmax; pk++)
-    {
-        if(pk == p)
-            continue;
-        pkx = pk->xp; pkv = pk->vp;
-        x_0 = pkx[0] - px0; v_0 = pkv[0] - pv0;
-        x_1 = pkx[1] - px1; v_1 = pkv[1] - pv1;
-        x_2 = pkx[2] - px2; v_2 = pkv[2] - pv2;
-        // calculate factors needed
-        r_2 = x_0*x_0 + x_1*x_1 + x_2*x_2; //scal_prod(x_, x_);
-
-        if(r_2 < min_r2)
-        {
-            p->nearestneighbour = pk - parts;
-            min_r2 = r_2;
-        }
-
-        _1_over_r2 = 1. / r_2;
-        afact = pk->m * _1_over_r2;
-        if(maxforce < .0 || afact > maxforce)
-            maxforce = afact;
-        afact *= sqrt(_1_over_r2);
-        v_x_ = 3. * _1_over_r2 * (x_0*v_0 + x_1*v_1 + x_2*v_2); //scal_prod(v_, x_);
-
-        if(perturb)
-            if(
-                ((r_2 < r_perturb_2) &&
-                // calculate exact for star mass rather than maximum
-                (pk->m * r1_2 > PERTURBING_FORCE_RATIO * parts[0].m * r_2))
-            )
-            {
-                if(p->io_close_warn <= 0 || p->io_close_warn > 16 * r_2)
-                {
-                    fprintf(get_file(FILE_DEBUG),
-                            "#### [t=%1.12e] close encounter of m%d[%d] and m%d[%d]: %e (allowing %e, perturbing at %e) ####\n",
-                            t_total(p->t),
-                            p->name, (int)(p - parts),
-                            pk->name, (int)(pk - parts),
-                            convert_length(sqrt(r_2), 0),
-                            convert_length(C_2G_C2 * (pk->m + p->m), 0),
-                            convert_length(sqrt(pk->m / parts[0].m * scal_prod(px, px)), 0));
-                    fprintf(get_file(FILE_DEBUG),
-                            " CE %1.12e\t%d\t%e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%d\t%e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\t%1.10e\n",
-                            t_total(p->t),
-                            pk->name, convert_mass(pk->m, 0),
-                            convert_length(pkx[0], 0), convert_length(pkx[1], 0), convert_length(pkx[2], 0),
-                            convert_length(convert_time(pkv[0], 1), 0), convert_length(convert_time(pkv[1], 1), 0), convert_length(convert_time(pkv[2], 1), 0),
-                            p->name, convert_mass(p->m, 0),
-                            convert_length(px[0], 0), convert_length(px[1], 0), convert_length(px[2], 0),
-                            convert_length(convert_time(pv[0], 1), 0), convert_length(convert_time(pv[1], 1), 0), convert_length(convert_time(pv[2], 1), 0)
-                            );
-                    fflush(get_file(FILE_DEBUG));
-                    p->io_close_warn = r_2;
-                }
-                new_close_warn = 1;
-                p->energy = get_energy(parts, pcount, p - parts);
-            }
-        if(
-         (r_2 < rs_2) &&
-         // calculate exact for star mass rather than maximum
-         (r_2 < 9. * C_2G_C2 * C_2G_C2 * (p->m + pk->m) * (p->m + pk->m)))
-        {
-            // collision in 3 Schwarzschild-radii
-            fprintf(get_file(FILE_WARNING), "#### [t=%1.12e] COLLISION of m%d and m%d: %e (r_S = %e) ####\n",
-                    t_total(p->t),
-                    p->name,
-                    pk->name,
-                    convert_length(sqrt(r_2), 0),
-                    convert_length(C_2G_C2 * (pk->m + p->m), 0));
-            fflush(get_file(FILE_WARNING));
-            add_close(parts, p, pk);
-        }
-
-        // find approaching particles in vicinity
-        else if(r_2 < r_vic_2 && v_x_ < 0)
-            add_close(parts, p, pk);
-
-        a0  += afact * x_0;
-        a_0 += afact * (v_0 - v_x_ * x_0);
-        a1  += afact * x_1;
-        a_1 += afact * (v_1 - v_x_ * x_1);
-        a2  += afact * x_2;
-        a_2 += afact * (v_2 - v_x_ * x_2);
-        phi -= afact * r_2;
-    }
-    //
-    // END FOR
-    //
+    //if (posmax - posmin > pcount*0.5)
+    //{
+    //    iteration_split(parts, pcount, pos, posmin,posmax, p,
+    //                  px, pv,
+    //                  &a0, &a1, &a2, &a_0, &a_1, &a_2, r_vic_2, &phi,
+    //                  maxforce, r_perturb_2, r1_2, perturb, rs_2,
+    //                  &new_close_warn);
+    //}
+    //else
+    //{
+        iteration_normal(parts, pcount, pos, posmin,posmax, p,
+                      px, pv,
+                      &a0, &a1, &a2, &a_0, &a_1, &a_2, r_vic_2, &phi,
+                      maxforce, r_perturb_2, r1_2, perturb, rs_2,
+                      &new_close_warn);
+    //}
 
     a[0] = a0; a_[0] = a_0;
     a[1] = a1; a_[1] = a_1;
     a[2] = a2; a_[2] = a_2;
 
+    //printf("%.15f\t%.15f\t%.15f\t%.15f\t%.15f\t%.15f\t%.15f\n",a[0],a[1],a[2],a_[0],a_[1],a[2],phi);
     p->phi_stars = phi;
     p->phi_bgr = .0;
 
@@ -764,6 +921,9 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
     collisions = 0;
     int re_evaluate = 0;
     struct particle *pk;
+
+    // CUDA
+    //allocCudaMem(pcount);
 
     close_n = 0;
     if(close_list == NULL)
@@ -1052,6 +1212,9 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
     parts->vp[0] = parts->vp[1] = parts->vp[2] = 0;
     parts->xp[0] = parts->xp[1] = parts->xp[2] = 0;
     parts->t = tmin;
+
+    // CUDA
+    //freeCudaMem();
 
     _exit_function();
     return movecount;

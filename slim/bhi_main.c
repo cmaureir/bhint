@@ -85,20 +85,19 @@ void output_stepsize()
 
 double get_energy(struct particle parts[], int pcount, int pos)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_GET_ENERGY);
-    struct particle *p=parts+pos, *pk;
+    struct particle p=parts[pos];
     double e;
+    int i;
 
-    e = scal_prod(p->v,  p->v) * p->m * .5;
-    for(pk = parts; pk < parts + pcount; pk++)
+    e = scal_prod(p.v,  p.v) * p.m * .5;
+
+    for(i = 0; i < pcount; i++)
     {
-        if(p != pk)
+        if(i != pos)
         {
-            e -= p->m * pk->m / sqrt(v_dist(p->x,  pk->x,  2) + (pk > parts ? softening_par2 : .0)) * ((pk >= parts + 1) ? .5 : 1.);
+            e -= p.m * parts[i].m / sqrt(v_dist(p.x,  parts[i].x,  2) + (i > 0 ? softening_par2 : .0)) * ((i >= 1) ? .5 : 1.);
         }
     }
-
-    _exit_function();
 
     return e;
 }
@@ -383,7 +382,7 @@ void integrate( struct particle parts[], int pcount,
 
         //PARTICLES
         fscanf(dumpfile, "%*s%*c");
-        assert(pcount == fread(parts, sizeof(struct particle), pcount, dumpfile));
+        assert(pcount == (int)fread(parts, sizeof(struct particle), pcount, dumpfile));
 
         for(p = parts; p < parts + pcount; p++)
             if(p > parts && p->m > _m_max
@@ -657,17 +656,19 @@ int main(int argc, char **argv)
     _enter_function(_UL_NBODY, _UL_NBODY_MAIN);
     double t_steps=0.0;
     struct particle *parts[1];
-    char mode='s', *infile_name="", *outfile_name=(char*)malloc(300), method='u', *c;
+    char mode='s';
+    char *infile_name=(char*)"";
+    char *outfile_name=(char*)malloc(300), method='u', *c;
     double orbits=10;
     int pcount=0, i;
     FILE *infile=NULL;
     double t_=t_maxval+DT_TOLERANCE*.5;
 
-    signal(SIGINT, sigproc);
-    signal(SIGQUIT, sigproc);
-    signal(SIGTERM, sigproc);
-    signal(SIGUSR1, sigproc);
-    signal(SIGUSR2, sigproc);
+    //signal(SIGINT, sigproc);
+    //signal(SIGQUIT, sigproc);
+    //signal(SIGTERM, sigproc);
+    //signal(SIGUSR1, sigproc);
+    //signal(SIGUSR2, sigproc);
     //signal(SIGSEGV, sigproc);
 
     while(t_ > t_maxval)
