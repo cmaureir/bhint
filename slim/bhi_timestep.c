@@ -11,7 +11,6 @@
 #define WARN_CLOSEENC              // warn for close encounters
 //#define DEBUG_ALL
 
-enum _function {_UL_TIMESTEP_CHECK_FAST_APPROACHES=0, _UL_TIMESTEP_NORMALIZE_DT};
 unsigned long count_approach_reduce_t=0, count_approach_checks=0;
 double count_approach_reduce_t_over=.0, count_approach_checks_over=0;
 double _1_3 = 1. / 3., _1_27 = 1. / 27.;
@@ -34,7 +33,6 @@ int check_fast_approaches(  struct particle *parts,
                             struct particle *p, struct particle *pk/*,
                             double r_2*/)
 {
-    _enter_function(_UL_TIMESTEP, _UL_TIMESTEP_CHECK_FAST_APPROACHES);
     int i, collision=0;
     double temp, r_close_2=-1., r_temp_2, t_close, dt=.0, dt2=.0, dt3=.0, dt4=.0, dt5=.0;
     double *px=p->x, *pv=p->v, *pkx, *pkv, r_2;
@@ -300,7 +298,6 @@ int check_fast_approaches(  struct particle *parts,
             break;
         }
 
-     _exit_function();
     return collision;
 }
 
@@ -312,7 +309,6 @@ int check_fast_approaches(  struct particle *parts,
 double normalize_dt(double t, double dt)
 {
     int exp_;
-    _enter_function(_UL_TIMESTEP, _UL_TIMESTEP_NORMALIZE_DT);
     //dt = pow(2., floor(log(dt) / log(2.) +.001));
 
     frexp(dt, &exp_);
@@ -324,7 +320,6 @@ double normalize_dt(double t, double dt)
         dt *= .5;
     }
     assert(t + dt > t);
-    _exit_function();
 
     return dt;
 }

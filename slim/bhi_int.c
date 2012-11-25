@@ -1,8 +1,3 @@
-/*                                        *
- * U. Loeckmann                           *
- * Kepler-Hermite integrator              *
- * for N-body problem.                    *
- *                                        */
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
@@ -55,34 +50,12 @@ static struct particle ***coll_vector=NULL;
 
 #define PERTURBING_FORCE_RATIO .3  // at which ratio of central force is a particle perturber?
 
-enum _function {_UL_HERMITE2_REGISTER_DT=0, _UL_HERMITE2_INIT_DT, _UL_HERMITE2_PREDICT_PART, _UL_HERMITE2_ADD_CLOSE,
-                _UL_HERMITE2_ADD_COLLISION, _UL_HERMITE2_EVALUATE_1, _UL_HERMITE2_CHECK_APP, _UL_HERMITE2_CORRECT_TIMESTEP,
-                _UL_HERMITE2_FIND_MOVE_PARTICLES, _UL_HERMITE2_GR_FORCE_COM, _UL_HERMITE2_GR_JERK_COM, _UL_HERMITE2_GR_FORCE,
-                _UL_HERMITE2_GR_JERK, _UL_HERMITE2_PATH_INTEGRAL, _UL_HERMITE2_MOVE_KEPLER, _UL_HERMITE2_HERMITE_CORRECT,
-                _UL_HERMITE2_FIND_TIMESTEPS, _UL_HERMITE2_HERM_PRED,
-                _UL_HERMITE2_FIND_NEIGHBOURS,  _UL_HERMITE2_STEP_HERMITE, _UL_HERMITE2_XXXXXXXXX,
-                _G6_SET_TI, _G6_CALC_FIRSTHALF, _G6_CALC_LASTHALF, _G6_READ_NEIGHBOUR_LIST,
-                _G6_GET_NEIGHBOUR_LIST, _UL_HERMITE2_ADD_FORCE_EXTPOT};
-
-// CUDA global variables
-// new_close_warn
-struct particle *d_p;
-double *d_x, *d_v;
-double *d_px, *d_pv;
-double *d_a0, *d_a1, *d_a2, *d_a_0, *d_a_1, *d_a_2, *d_phi;
-double *h_a0, *h_a1, *h_a2, *h_a_0, *h_a_1, *h_a_2, *h_phi;
-double *d_afact, *d_afact_, *d_io_close;
-int *d_close, *d_nearest, *d_energy;
-// Maybe, bank conflict
-int *d_new_close_warn;
-
 //
 // add_close
 //
 void add_close(struct particle *p, struct particle *pk)
 {
     //printf("%d\t%d\n", p->name, pk->name);
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_ADD_CLOSE);
     if(close_list == NULL)
         close_list = (struct t_close *)malloc(CLOSE_MAX * sizeof(struct t_close));
     assert(p != pk);
@@ -95,7 +68,6 @@ void add_close(struct particle *p, struct particle *pk)
                     close_max,
                     p->name, pk->name);
                     fflush(get_file(FILE_WARNING));
-            _exit_function();
             return;
         }
         //printf("!!! %d\n", close_max);
@@ -105,7 +77,6 @@ void add_close(struct particle *p, struct particle *pk)
     }
     close_list[close_n].p = p;
     close_list[close_n++].pk = pk;
-    _exit_function();
 }
 // END
 // add_close
@@ -336,7 +307,6 @@ void iteration_normal(struct particle parts[],int pcount, int pos, int posmin, i
 //
 void register_dt(int pos, double dt)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_REGISTER_DT);
     int n = floor(log(1.1 * dt) * _1_LOG2) + MAX_STEPSIZE_POWER;
 
     assert(n >= 0); assert(n < 2 * MAX_STEPSIZE_POWER);
@@ -352,7 +322,6 @@ void register_dt(int pos, double dt)
 
     step_part[n][step_count[n]++] = pos;
     inc_stepsize(n);
-    _exit_function();
 }
 // END
 // register_dt
@@ -365,7 +334,6 @@ void init_dt(struct particle *parts, int pcount, int rebuild)
     static int init=0;
     if(init && !rebuild)
         return;
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_INIT_DT);
 
     int j, n;
     step_min = 2 * MAX_STEPSIZE_POWER;
@@ -393,7 +361,6 @@ void init_dt(struct particle *parts, int pcount, int rebuild)
     fflush(get_file(FILE_DEBUG));
 
     init = 1;
-    _exit_function();
 }
 // END
 // init_dt
@@ -405,7 +372,6 @@ void init_dt(struct particle *parts, int pcount, int rebuild)
 //
 void predict_part_hermite2(struct particle *p, double t)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_PREDICT_PART);
     int i;
     double dt, dt2, dt3, dt4, dt5;
     double dtn, dt2n, dt3n, dt4n, dt5n;
@@ -428,15 +394,8 @@ void predict_part_hermite2(struct particle *p, double t)
         // perturbing forces
         p->xp[i] += dt2n * p->a[i] + dt3n * p->a_[i] + dt4n * p->a_2[i] + dt5n * p->a_3[i];
         p->vp[i] += dtn  * p->a[i] + dt2n * p->a_[i] + dt3n * p->a_2[i] + dt4n * p->a_3[i];
-        // relativistic forces
-        if(p->use_pn)
-        {
-            p->xp[i] += dt2n * p->gr_a[i] + dt3n * p->gr_a_[i] + dt4n * p->gr_a_2[i] + dt5n * p->gr_a_3[i];
-            p->vp[i] += dtn  * p->gr_a[i] + dt2n * p->gr_a_[i] + dt3n * p->gr_a_2[i] + dt4n * p->gr_a_3[i];
-        }
     }
 
-    _exit_function();
 }
 // END
 // predict_part_hermite2
@@ -447,12 +406,10 @@ void predict_part_hermite2(struct particle *p, double t)
 //
 void add_collision(struct particle *p, struct particle *pk)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_ADD_COLLISION);
     int co;
     for(co = 0; co < collisions; co++)
         if(coll_vector[co][0] == p || coll_vector[co][0] == pk || coll_vector[co][1] == p || coll_vector[co][1] == pk)
         {
-            _exit_function();
             return;
         }
     if(collisions + 1 > max_collisions)
@@ -473,7 +430,6 @@ void add_collision(struct particle *p, struct particle *pk)
         coll_vector[collisions][1] = p;
     }
     collisions++;
-    _exit_function();
 }
 // END
 // add_collision
@@ -483,7 +439,6 @@ void add_collision(struct particle *p, struct particle *pk)
 //
 void check_app(struct particle *parts, int pcount, double t)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_CHECK_APP);
     int j, collision;
 
     for(j = 0; j < close_n; j++)
@@ -496,7 +451,6 @@ void check_app(struct particle *parts, int pcount, double t)
 
     }
 
-     _exit_function();
 }
 // END
 // check_app
@@ -506,7 +460,6 @@ void check_app(struct particle *parts, int pcount, double t)
 //
 void correct_timestep(struct particle *parts, int pcount, double tmin)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_CORRECT_TIMESTEP);
     int j;
     struct particle *p;
 
@@ -525,7 +478,6 @@ void correct_timestep(struct particle *parts, int pcount, double tmin)
 
         register_dt(active[j], p->dt);
     }
-    _exit_function();
 }
 // END
 // correct_timestep
@@ -556,7 +508,6 @@ void sumforce(struct particle *parts)
 //
 void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_FIND_MOVE_PARTICLES);
     struct particle *p;
     double tmin=-1.;
     //double help;
@@ -581,7 +532,6 @@ void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
     }
     assert(movecount > 0);
     *tmin_out = tmin;
-    _exit_function();
 }
 // END
 // find_move_particles
@@ -590,7 +540,6 @@ void find_move_particles(struct particle *parts, int pcount, double *tmin_out)
 //
 void path_integral(int order, double dt, struct particle *p, double sign)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_PATH_INTEGRAL);
 
     double a[3]   = {p->a[0]   + p->ha[0]   + p->gr_a[0],   p->a[1]   + p->ha[1]   + p->gr_a[1],   p->a[2]   + p->ha[2]   + p->gr_a[2]};
     double a_[3]  = {p->a_[0]  + p->ha_[0]  + p->gr_a_[0],  p->a_[1]  + p->ha_[1]  + p->gr_a_[1],  p->a_[2]  + p->ha_[2]  + p->gr_a_[2]};
@@ -626,7 +575,6 @@ void path_integral(int order, double dt, struct particle *p, double sign)
                             + sign * .05 * dt * (scal_prod(a_2, p->gr_a) + 3. * scal_prod(a_, p->gr_a_) + 3. * scal_prod(a, p->gr_a_2)
                             + scal_prod(p->v, p->gr_a_3))))));
     }
-    _exit_function();
 }
 // END
 // path_integral
@@ -637,37 +585,52 @@ void path_integral(int order, double dt, struct particle *p, double sign)
 //
 void move_kepler(struct particle *parts, int pcount, double tmin)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_MOVE_KEPLER);
     struct particle *p;
     double *px, *pxp, *pv, *pvp;
     double dt;
     int j;
+    printf("ITIME: %.10f\n",tmin);
 
     for(j = 0; j < movecount; j++)
         if(parts[active[j]].t <= tmin - DT_TOLERANCE)
         {
+        //printf("Moving particle: %i\nMovecount: %d\nTime (t): %.10f\nTime(dt): %.10f\nTime (tmin): %.10f\n",
+        //active[j],movecount, parts[active[j]].t, parts[active[j]].dt, tmin);
             p = parts + active[j];
-            px = p->x; pv = p->v; pxp = p->xp; pvp = p->vp;
-            //p->io_steps_c++;
-            pxp[0] = px[0]; pxp[1] = px[1]; pxp[2] = px[2];
-            pvp[0] = pv[0]; pvp[1] = pv[1]; pvp[2] = pv[2];
+            px = p->x;
+            pv = p->v;
+
+            pxp = p->xp;
+            pvp = p->vp;
+
+            pxp[0] = px[0];
+            pxp[1] = px[1];
+            pxp[2] = px[2];
+
+            pvp[0] = pv[0];
+            pvp[1] = pv[1];
+            pvp[2] = pv[2];
 
             dt = tmin - p->t;
 
+            std::cout << "Self (dt):"  << parts[active[j]].dt  << std::endl;
+            std::cout << "Calculated (dt):"  << dt  << std::endl;
+
             for(;p->t < tmin; p->t += dt)
             {
+                std::cout << "Loop time: " << p->t << std::endl;
                 p->io_steps_c++;
 
-                step_kepler_1(parts, pcount, p - parts, dt, p->ha, p->ha_, p->ha_2,
-                        p->ha_3
-                        , &(p->curr_a), &(p->curr_e));
+                step_kepler_1(parts, pcount, p - parts, dt,
+                              p->ha, p->ha_, p->ha_2, p->ha_3,
+                              &(p->curr_a), &(p->curr_e));
 
             }
+            std::cout << "End for" << std::endl;
 
             px[0] = pxp[0]; px[1] = pxp[1]; px[2] = pxp[2];
             pv[0] = pvp[0]; pv[1] = pvp[1]; pv[2] = pvp[2];
         }
-        _exit_function();
 }
 // END
 // move_kepler
@@ -678,7 +641,6 @@ void move_kepler(struct particle *parts, int pcount, double tmin)
 //
 void hermite_correct(struct particle *parts, int pcount)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_HERMITE_CORRECT);
     double dt=.0, dt2=.0, dt3=.0, dt4=.0, dt5=.0, _1_dt2=.0, _1_dt3=.0;
     int i, j;
     struct particle *p;
@@ -704,7 +666,6 @@ void hermite_correct(struct particle *parts, int pcount)
             p->a_[i]  = p->a_n[i];
         }
     }
-    _exit_function();
 }
 // END
 // hermite_correct
@@ -734,7 +695,6 @@ double get_timestep_central(struct particle *parts, struct particle *p, double m
 //
 void find_timesteps(struct particle *parts, int pcount, double tmin, double eta, double min_evals)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_FIND_TIMESTEPS);
     double dt, dtn;
     struct particle *p;
     int j, exp_;
@@ -764,7 +724,6 @@ void find_timesteps(struct particle *parts, int pcount, double tmin, double eta,
         p->dt = ldexp(.5, exp_);
 
     }
-    _exit_function();
 }
 // END
 // find_timesteps
@@ -775,7 +734,6 @@ void find_timesteps(struct particle *parts, int pcount, double tmin, double eta,
 //
 void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_HERM_PRED);
     double dt, dt2, dt3, dt4, dt5;
     int i;
     struct particle *p;
@@ -785,17 +743,22 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
         if(!p->active && (p->t <= tmin - DT_TOLERANCE))
         {
             dt = tmin - p->t;
-            dt2 = .5 * dt * dt; dt3 = dt * dt2 * _1_3; dt4 = .25 * dt * dt3; dt5 = .2 * dt * dt4;
+            dt2 = .5 * dt * dt;
+            dt3 = dt * dt2 * _1_3;
+            dt4 = .25 * dt * dt3;
+            dt5 = .2 * dt * dt4;
             for(i = 0; i < DIMENSIONS; i++)
-                p->xp[i] = p->x[i]+ dt * p->v[i] + dt2 * (p->a[i] + p->ha[i]) + dt3 * p->ha_[i]
-                                       + dt4 * p->ha_2[i]+ dt5 * p->ha_3[i];
+                p->xp[i] = p->x[i]+ dt * p->v[i] + dt2 * (p->a[i] + p->ha[i]) + dt3 * p->ha_[i] + dt4 * p->ha_2[i]+ dt5 * p->ha_3[i];
         }
         else
         {
             if(p->active)
             {
                 dt = p->dt;
-                dt2 = dt * dt  * .5; dt3 = dt * dt2 * _1_3; dt4 = dt * dt3 * .25; dt5 = dt * dt4 * .2;
+                dt2 = dt * dt  * .5;
+                dt3 = dt * dt2 * _1_3;
+                dt4 = dt * dt3 * .25;
+                dt5 = dt * dt4 * .2;
                 for(i = 0; i < DIMENSIONS; i++)
                 {
                     p->x[i] += dt2 * p->a[i] + dt3 * p->a_[i];// + dt4 * p->a_2[i] + dt5 * p->a_3[i];
@@ -810,7 +773,6 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
         }
     }
 
-    _exit_function();
 }
 // END
 // herm_pred
@@ -825,7 +787,6 @@ void herm_pred(struct particle *parts, int pcount, double tmin, int pred_only)
 double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, int posmax,
                     double a[3], double a_[3])
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_EVALUATE_1);
     int new_close_warn = 0;
     int perturb = (posmax>0?1:0);
     struct particle *p = parts+pos;
@@ -899,7 +860,6 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
         {
             p->io_close_warn = -1.;
         }
-        _exit_function();
         return maxforce;
 }
 // END
@@ -914,16 +874,12 @@ double evaluate_1_2(struct particle parts[], int pcount, int pos, int posmin, in
 // _comp_ = 1 for composite, _comp_ = 0 otherwise.
 int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_evals, double *t_eval)
 {
-    _enter_function(_UL_HERMITE2, _UL_HERMITE2_STEP_HERMITE);
     int i, j, k, removecount=0; //, i;
     double tmin = -1.0, en;
     struct particle *p;
     collisions = 0;
     int re_evaluate = 0;
     struct particle *pk;
-
-    // CUDA
-    //allocCudaMem(pcount);
 
     close_n = 0;
     if(close_list == NULL)
@@ -938,6 +894,7 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
 
     // find particles to move
     init_dt(parts, *pcount, 0);
+    fprintf(stderr,"ITIME: %f\n",*t_eval);
 
     find_move_particles(parts, *pcount, &tmin);
 
@@ -1216,7 +1173,6 @@ int step_hermite_2(struct particle parts[], int *pcount, double eta, double min_
     // CUDA
     //freeCudaMem();
 
-    _exit_function();
     return movecount;
 }
 // END

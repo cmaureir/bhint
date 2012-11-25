@@ -4,9 +4,6 @@
 #include <math.h>
 #include "bhi.h"
 
-enum _function {_UL_KEPLER_GET_COMMON=0, _UL_KEPLER_GET_JACOBI, _UL_KEPLER_UNJACOBI, _UL_KEPLER_GET_CONSTANTS,
-                _UL_KEPLER_GET_REDUCED, _UL_KEPLER_STEP_KEPLER_1, _UL_KEPLER_STEP_KEPLER, _UL_KEPLER_SOLVE_KEPLER,
-                _UL_KEPLER_KEPLER};
 #define DEL_E          9.e-16  /* maximum error in angle E for kepler equation            */
 #define DEL_E_HYP      2.e-15  /* maximum error in angle E for hyperbolic kepler equation */
 #define MAX_ITER       50      /* maximum number of iterations to solve kepler            */
@@ -27,101 +24,6 @@ static double
     _1_4_3 = 1./4./3.,
     _1_3_2 = 1./3./2.;
 
-/*
- * Get center of mass / total momentum
- * of predicted values for first _pcount_ particles into _com_.
- * Possible values for _val_:
- *    'x' for center of mass
- *    'v' for total momentum
- */
-void get_common(struct particle parts[], int pcount, double com[3], char val)
-{
-    _enter_function(_UL_KEPLER, _UL_KEPLER_GET_COMMON);
-    int i;
-    struct particle *p;
-
-    for(i = 0; i < 3; i++)
-    {
-        com[i] = .0;
-        for(p = parts; p < parts + pcount; p++)
-        {
-            switch(val)
-            {
-                case 'x' : com[i] += p->m * p->xp[i]; break;
-                case 'v' : com[i] += p->m * p->vp[i]; break;
-            }
-        }
-        com[i] /= parts[pcount-1].eta;
-    }
-
-    _exit_function();
-}
-
-
-/*
- * Convert predicted values from cartesian to Jacobi coordinates.
- */
-void get_jacobi(struct particle parts[], int pcount)
-{
-    _enter_function(_UL_KEPLER, _UL_KEPLER_GET_JACOBI);
-    int i, j;
-    double x_[3], v_[3];
-
-    for(j = pcount - 1; j > 0; j--)
-    {
-        if(parts[j].is_jacobi)
-            continue;
-        get_common(parts, j, x_, 'x');
-        get_common(parts, j, v_, 'v');
-        for(i = 0; i < DIMENSIONS; i++)
-        {
-            parts[j].xp[i] -= x_[i];
-            parts[j].vp[i] -= v_[i];
-        }
-        parts[j].is_jacobi = 1;
-    }
-
-    for(i = 0; i < DIMENSIONS; i++)
-    {
-        parts[0].xp[i] = .0;
-        parts[0].vp[i] = .0;
-    }
-    parts[0].is_jacobi = 1;
-
-    _exit_function();
-}
-
-/*
- * Convert predicted values from Jacobi
- * back to cartesian coordinates.
- */
-void unjacobi(struct particle parts[], int pcount, int keep_cartesian)
-{
-    _enter_function(_UL_KEPLER, _UL_KEPLER_UNJACOBI);
-    int i;
-    struct particle *p;
-    double sumx[3] = {.0, .0, .0}, sumv[3] = {.0, .0, .0};
-
-    for(p = parts + pcount-1; p >= parts; p--)
-    {
-        assert(p->is_jacobi);
-        for(i = 0; i < DIMENSIONS; i++)
-        {
-            p->xpc[i] = p->m_ / p->m * p->xp[i] - sumx[i] / p->eta;
-            p->vpc[i] = p->m_ / p->m * p->vp[i] - sumv[i] / p->eta;
-            if(keep_cartesian)
-            {
-                p->xp[i] = p->xpc[i];
-                p->vp[i] = p->vpc[i];
-                p->is_jacobi = 0;
-            }
-            sumx[i] += p->m * p->xpc[i];
-            sumv[i] += p->m * p->vpc[i];
-        }
-    }
-
-    _exit_function();
-}
 
 /*
  * Retrieve constants of motion (as if) in 2-body problem.
@@ -130,7 +32,6 @@ void unjacobi(struct particle parts[], int pcount, int keep_cartesian)
 void get_constants( double x[3], double v[3], double m_central,
                     double j[3], double e[3], double *a, double *omega)
 {
-    _enter_function(_UL_KEPLER, _UL_KEPLER_GET_CONSTANTS);
     int i;
 
     vec_prod(x, v, j);
@@ -140,8 +41,6 @@ void get_constants( double x[3], double v[3], double m_central,
         e[i] = e[i]/m_central - x[i]/r;
     *a = scal_prod(j, j) / m_central / fabs(1 - scal_prod(e, e));
     *omega = sqrt(m_central / pow(*a, 3.0));
-
-    _exit_function();
 }
 
 /*
@@ -151,7 +50,6 @@ void get_constants( double x[3], double v[3], double m_central,
  */
 void get_reduced(struct particle parts[], int pos, double *red_e, double *red_a, double *red_t, double *red_j)
 {
-    _enter_function(_UL_KEPLER, _UL_KEPLER_GET_REDUCED);
     int i;
     double r_[3], v_[3], j[3], e[3], a, omega;
 
@@ -167,7 +65,6 @@ void get_reduced(struct particle parts[], int pos, double *red_e, double *red_a,
     *red_t = 2*M_PI/omega;
     *red_j = v_abs(j);
 
-    _exit_function();
 }
 
 /*
@@ -179,12 +76,14 @@ void step_kepler_1(struct particle parts[], int pcount, int pos, double dt,
                    double *out_a, double *out_a_, double *out_a_2, double *out_a_3,
                    double *curr_a, double *curr_e)
 {
-    _enter_function(_UL_KEPLER, _UL_KEPLER_STEP_KEPLER_1);
     int i;
     struct particle *p0 = parts, *p1 = parts + pos;
     double r_[3], v_[3], j_[3], ecc_[3], a_[3], b_[3], _1_r2, afact, v_r_, v_v_, r_a_, v_a_, r_a__;
     double ecc, a, r, v, b, omega, e, mean, cosp, sinp;
     double m_c=p0->m, _cosp_ecc, e2, _1_ecc, _cosp_1, de_dt;//+p1->m;
+
+    printf("Central Mass: %.10f %.10f\n", m_c, parts[0].m);
+    getchar();
 
     // get relative position / motion
     for(i = 0; i < 3; i++)
@@ -193,9 +92,13 @@ void step_kepler_1(struct particle parts[], int pcount, int pos, double dt,
         v_[i] = p1->vp[i] - p0->vp[i];
     }
 
+    printf("Particle: %d (%.10f, %.10f, %.10f)\n", pos, p1->xp[0], p1->xp[1], p1->xp[2]);
     // calculate ellipse constants
     get_constants(r_, v_, m_c, j_, ecc_, &a, &omega);
-    //printf("#  [%d]:\t%e\t%e\t%e\n", pos, v_abs(ecc_), a, omega);
+    printf("a : %.10f\n", a);
+    printf("Omega: %.10f\n",omega);
+    //printf("Angular momentum vector: %.10f %.10f %.10f\n", j_[0], j_[1], j_[2]);
+    //getchar();
 
     ecc = v_abs(ecc_);
     // b_ = a * sqrt(|1-e²|) * (j_ x e_) / |j_ x e_|
@@ -270,11 +173,16 @@ void step_kepler_1(struct particle parts[], int pcount, int pos, double dt,
 
         // calculate eccentric anomaly e at t+dt
         e = (a + v_abs(r_)) / (ecc * a);
+        //printf("e_anomaly (1): %.10f\n", e);
         if(e < 1.0) e = .0;
         else if(scal_prod(r_, v_) < 0) e = -acosh(e);
         else e = acosh(e);
 
+        //printf("e_anomaly (2): %.10f\n", e);
+        //printf("kepler args: %.10f %.10f\n", ecc,  ecc * sinh(e) - e + dt * omega);
         e = kepler(ecc, ecc * sinh(e) - e + dt * omega);
+        //printf("e_anomaly (3): %.10f\n", e);
+        getchar();
         cosp = cosh(e);
         sinp = sinh(e);
         de_dt = omega / (ecc * cosp - 1.);
@@ -334,61 +242,7 @@ void step_kepler_1(struct particle parts[], int pcount, int pos, double dt,
             }
     }
 
-    _exit_function();
 }
-
-/*
- * Calculate Kepler step.
- */
-int step_kepler(struct particle parts[], int pcount)
-{
-    _enter_function(_UL_KEPLER, _UL_KEPLER_STEP_KEPLER);
-    int i, step=0;
-    double t0=-1.0;
-    double tmin = -1.0;
-    struct particle *p;
-
-    // find next particle to move
-    for(p = parts + 1; p < parts + pcount; p++)
-        if(tmin < 0 || p->t + p->dt < tmin)
-            tmin = p->t + p->dt;
-        for(p = parts + 1; p < parts + pcount; p++)
-            if((p->t + p->dt <= tmin + DT_TOLERANCE) && (p->t < t0 || t0 < 0))
-                t0 = p->t;
-
-    // move all particles to be moved
-    for(p = parts + 1; p < parts + pcount; p++)
-    {
-        if(p->t + p->dt > tmin + DT_TOLERANCE || p->t > t0 + DT_TOLERANCE)
-            continue;
-        step = 1;
-        for(i = 0; i < 3; i++)
-        {
-            p->xp[i] = p->x[i];
-            p->vp[i] = p->v[i];
-        }
-        step_kepler_1(parts, pcount, p - parts, tmin-p->t, NULL, NULL, NULL, NULL, &(p->curr_a), &(p->curr_e));
-        p->t = tmin;
-        // calculate new timestep
-        // timestep for kepler orbit
-        p->dt = get_timestep_simple(parts[0].xp, parts[0].vp, p->x, p->v);
-    }
-
-    // make sure has moved at least 1 particle
-    assert(step == 1);
-
-    for(p = parts + 1; p < parts + pcount; p++)
-        for(i = 0; i < 3; i++)
-        {
-            p->x[i] = p->xp[i];
-            p->v[i] = p->vp[i];
-        }
-    parts[0].t = tmin;
-
-    _exit_function();
-    return pcount-1;
-}
-
 /*
  * Solve kepler equation for given
  * mean anomaly and eccentricity.
@@ -396,7 +250,6 @@ int step_kepler(struct particle parts[], int pcount)
  */
 double solve_kepler(double mean, double ecc)
 {
-    _enter_function(_UL_KEPLER, _UL_KEPLER_SOLVE_KEPLER);
      double e = ecc > .8 ? M_PI : mean, d;//, e2=e;//, de, e1;
 
     int n_iter = 0;
@@ -414,7 +267,6 @@ double solve_kepler(double mean, double ecc)
         e -= d / (1.0 - ecc * cos(e));
     }
 
-    _exit_function();
 
     return e;
 }
@@ -430,7 +282,6 @@ double kepler(const double ecc, double mean_anom)
 
     if(!mean_anom)
         return(0.);
-    _enter_function(_UL_KEPLER, _UL_KEPLER_KEPLER);
 
     if(ecc < .3)     /* low-eccentricity formula from Meeus,  p. 195 */
     {
@@ -438,7 +289,6 @@ double kepler(const double ecc, double mean_anom)
         /* one correction step,  and we're done */
         err = curr - ecc * sin(curr) - mean_anom;
         curr -= err / (1. - ecc * cos(curr));
-        _exit_function();
 
         return(curr);
     }
@@ -557,6 +407,5 @@ double kepler(const double ecc, double mean_anom)
         }
      }
 
-    _exit_function();
     return(is_negative ? -curr : curr);
 }

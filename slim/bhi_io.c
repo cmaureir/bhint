@@ -10,10 +10,6 @@
  * for N-body problem.                    *
  *                                        */
 
-enum _function {_UL_IO_OPEN_FILE=0, _UL_IO_INIT_FILES, _UL_IO_GET_PARAMS, _UL_IO_OUTPUT,
-                _UL_IO_CALC, _UL_IO_CREATE, _UL_IO_OUTPUT_ENERGY, _UL_IO_CONVERT_TO_NBODY_UNITS,
-                _UL_IO_CALC_ENERGIES, _UL_IO_COMMENT_DATAFILE};
-
 //#define DUMP_BEFORE_ERR [TESTING]
 #define OUTPUT_INITDATA       0    // maximum particle name to print initial data for; -1 for all
 #define MAX_FILES 20
@@ -88,7 +84,6 @@ FILE *get_file(int filetype)
  */
 FILE *open_file(const char *ext, int append, int no)
 {
-    _enter_function(_UL_IO, _UL_IO_OPEN_FILE);
     char *newname = (char *)malloc(strlen(filename)+50);
 
     strcpy(newname, filename);
@@ -100,7 +95,6 @@ FILE *open_file(const char *ext, int append, int no)
     }
     strcat(newname, ".");
     strcat(newname, ext);
-    _exit_function();
 
     return fopen(newname, append ? "a" : "w");
 }
@@ -110,7 +104,6 @@ FILE *open_file(const char *ext, int append, int no)
  */
 void init_files(const char *fname, int append)
 {
-    _enter_function(_UL_IO, _UL_IO_INIT_FILES);
     int i;
 
     filename = (char *)malloc(strlen(fname)+1);
@@ -126,7 +119,6 @@ void init_files(const char *fname, int append)
     file[FILE_DEBUG]   = open_file(EXT_DEBUG,   append, 0);
     file[FILE_WARNING] = open_file(EXT_WARNING, append, 0);
     file[FILE_OTHER]   = open_file(EXT_OTHER,   append, 0);
-    _exit_function();
 }
 
 /*
@@ -212,7 +204,6 @@ double convert_length(double length, int forward)
  */
 int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount, double *m_max)
 {
-    _enter_function(_UL_IO, _UL_IO_GET_PARAMS);
     int i, j, k;
 
     *m_max = .0;
@@ -313,7 +304,6 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                 }
 
                 (*parts)[j].v_thresh_2 = .0;
-                (*parts)[j].use_pn     = 0;
                 (*parts)[j].phi_stars    = .0;
                 (*parts)[j].phi_bgr    = .0;
                 (*parts)[j].t      = .0;
@@ -367,7 +357,6 @@ int get_params(struct particle *parts[], double *time, FILE *infile, int *pcount
                             (*parts)[j].v[0] * _conv_v, (*parts)[j].v[1] * _conv_v, (*parts)[j].v[2] * _conv_v);
 
 
-            _exit_function();
 
             return 0;
 }
@@ -412,7 +401,6 @@ int output( int print, struct particle parts[], int pcount,
             double t, double t_over, double orbits, double t_steps, double t_max, double steps, double blocks,
             int orb_count)
 {
-    _enter_function(_UL_IO, _UL_IO_OUTPUT);
     double e, t_tot=t+t_over, stepsc=.0, stepsp=.0, sigma_a=.0, sigma_e=.0, sigma_j=.0, e_max=.0, a_min=.0, sigma_v=.0;
     double vr_2=.0, v_2=.0, vr[3];
     struct particle *p;
@@ -435,14 +423,12 @@ int output( int print, struct particle parts[], int pcount,
             if(fabs(t - p->t) > DT_TOLERANCE)
             {
                 //printf("%e\t\t", p->t);
-                _exit_function();
 
                 return -1;
             }
 
         if(t_tot <= .0)
         {
-            _exit_function();
             return 0;
         }
 
@@ -619,7 +605,6 @@ int output( int print, struct particle parts[], int pcount,
         #endif
     }
 
-    _exit_function();
     return 0;
 }
 
@@ -629,7 +614,6 @@ int output( int print, struct particle parts[], int pcount,
  */
 void calc(char **argv)
 {
-    _enter_function(_UL_IO, _UL_IO_CALC);
     int i;
     double r_[3], v_[3], j_[3], e_[3], omega, e, j, a_[3], b_[3], a, b, m=atof(argv[0])/_conv_m;
 
@@ -674,7 +658,6 @@ void calc(char **argv)
     printf("#	, .001*cos(t)+%e, .001*sin(t)+%e notitle with lines 2\\\n",
     r_[0] * _conv_x, r_[2] * _conv_x);
   */
-    _exit_function();
 }
 
 int smaller(const void *a, const void *b)
@@ -705,7 +688,6 @@ int smaller(const void *a, const void *b)
 
 void create(int argc, char **arg)
 {
-    _enter_function(_UL_IO, _UL_IO_CREATE);
 
     if(argc < 9 || (argc > 12 && argc % 1))
     {
@@ -872,7 +854,6 @@ void create(int argc, char **arg)
     }
     free(a);
 
-    _exit_function();
 }
 
 /*
@@ -886,7 +867,6 @@ void create(int argc, char **arg)
  */
 void convert_to_nbody_units(struct particle parts[], int pcount)
 {
-    _enter_function(_UL_IO, _UL_IO_CONVERT_TO_NBODY_UNITS);
 
     int i;
     double c_m=.0, c_r=.0, c_v=.0, e_pot=.0, c_v_[3]={0,0,0};
@@ -929,7 +909,6 @@ void convert_to_nbody_units(struct particle parts[], int pcount)
                     p->x[0], p->x[1], p->x[2],
                     p->v[0], p->v[1], p->v[2]);
 
-         _exit_function();
 }
 
 /*
@@ -937,7 +916,6 @@ void convert_to_nbody_units(struct particle parts[], int pcount)
  */
 void comment_datfile()
 {
-    _enter_function(_UL_IO, _UL_IO_COMMENT_DATAFILE);
     double m_cent = .0, _1_m_cent;
     double m, x[3], v[3], j[3], e[3], r, a, ecc2;
     char s[300];
@@ -982,7 +960,6 @@ void comment_datfile()
         printf("%s", s);
     }
 
-    _exit_function();
 }
 
 

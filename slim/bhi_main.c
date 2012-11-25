@@ -66,7 +66,6 @@ void inc_stepsize(int n)
 
 void output_stepsize()
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_OUTPUT_STEPSIZE);
     int n;
 
     for(n = 0; n < 2*MAX_STEPSIZE_POWER; n++)
@@ -80,24 +79,30 @@ void output_stepsize()
         }
     }
 
-    _exit_function();
 }
 
 double get_energy(struct particle parts[], int pcount, int pos)
 {
-    struct particle p=parts[pos];
+    struct particle *p=parts+pos, *pk;
     double e;
-    int i;
 
-    e = scal_prod(p.v,  p.v) * p.m * .5;
-
-    for(i = 0; i < pcount; i++)
+    e = scal_prod(p->v,  p->v) * p->m * .5;
+    for(pk = parts; pk < parts + pcount; pk++)
     {
-        if(i != pos)
+        if(p != pk)
         {
-            e -= p.m * parts[i].m / sqrt(v_dist(p.x,  parts[i].x,  2) + (i > 0 ? softening_par2 : .0)) * ((i >= 1) ? .5 : 1.);
+            e -= p->m * pk->m / sqrt(v_dist(p->x,  pk->x,  2) + (pk > parts ? softening_par2 : .0)) * ((pk >= parts + 1) ? .5 : 1.);
         }
     }
+
+    #ifdef EXT_POT
+    double phi=.0;
+    add_force_extpot(p->x, NULL, NULL, NULL, &phi);
+    e += p->m * phi;
+    //printf("%d\t%e\n", pos, e);
+    #endif // EXT_POT
+
+
 
     return e;
 }
@@ -107,7 +112,6 @@ double get_energy(struct particle parts[], int pcount, int pos)
  */
 double get_ekin(struct particle parts[], int pcount, int pred)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_GET_EKIN);
     struct particle *p;
     double e_kin = 0.0;
 
@@ -116,7 +120,6 @@ double get_ekin(struct particle parts[], int pcount, int pred)
         e_kin += (pred ? scal_prod(p->vp, p->vp) : scal_prod(p->v,  p->v)) * p->m * .5;
     }
 
-    _exit_function();
 
     return e_kin;
 }
@@ -127,7 +130,6 @@ double get_ekin(struct particle parts[], int pcount, int pred)
  */
 void get_acc(struct particle parts[], int pcount, int pos, double acc[3])
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_GET_ACC);
     int i;
     double dist3;
     struct particle *p=parts+pos, *p2;
@@ -148,7 +150,7 @@ void get_acc(struct particle parts[], int pcount, int pos, double acc[3])
             acc[i] -= p2->m / dist3 * (p->x[i] - p2->x[i]);
         }
     }
-    _exit_function();
+
 }
 
 /*
@@ -156,10 +158,16 @@ void get_acc(struct particle parts[], int pcount, int pos, double acc[3])
  */
 double get_epot(struct particle parts[], int pcount, int pred)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_GET_EPOT);
     double e_pot = 0.0;
     struct particle *p1;
 
+    #ifdef USE_GRAPE
+    for(p1 = parts + 1; p1 < parts + pcount; p1++)
+    {
+        e_pot += p1->m * (p1->phi_stars * .5 - parts[0].m / v_abs(p1->x));
+    }
+
+    #else
     struct particle *p2;
     for(p1 = parts; p1 < parts + pcount - 1; p1++)
     {
@@ -170,8 +178,17 @@ double get_epot(struct particle parts[], int pcount, int pred)
                      : sqrt(v_dist(p1->x,  p2->x,  2) + (p1 > parts ? softening_par2 : 0)));
         }
     }
+    #endif // USE_GRAPE
 
-    _exit_function();
+    #ifdef EXT_POT
+    for(p1 = parts + 1; p1 < parts + pcount; p1++)
+    {
+        double phi=.0;
+        add_force_extpot(pred ? p1->xp : p1->x, NULL, NULL, NULL, &phi);
+        e_pot += p1->m * phi;
+    }
+    #endif // EXT_POT
+
 
     return e_pot;
 }
@@ -185,12 +202,10 @@ double get_epot(struct particle parts[], int pcount, int pred)
  */
 void move_center(struct particle parts[], int pcount, double t)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_MOVE_CENTER);
     if(t >= 0)
     {
         parts[0].t = t;
     }
-    _exit_function();
 }
 
 /*
@@ -199,7 +214,6 @@ void move_center(struct particle parts[], int pcount, double t)
  */
 void predict_part(struct particle *p, double dt, int perturb_only)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_PREDICT_PART);
     int i;
     double dt2=.0, dt3=.0, dt4=.0, dt5=.0;
 
@@ -244,7 +258,6 @@ void predict_part(struct particle *p, double dt, int perturb_only)
         }
     }
 
-    _exit_function();
 }
 
 
@@ -254,14 +267,13 @@ void predict_part(struct particle *p, double dt, int perturb_only)
  */
 void predict(struct particle parts[], int pcount, double t)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_PREDICT);
     struct particle *p;
 
     for(p = parts+1; p < parts + pcount; p++)
     {
         predict_part_hermite2(p, t);
     }
-    _exit_function();
+
 }
 
 /*
@@ -270,7 +282,6 @@ void predict(struct particle parts[], int pcount, double t)
 
 double get_timestep_simple(double x0[3], double v0[3], double x[3], double v[3])
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_GET_TIMESTEP_SIMPLE);
     int i;
     double x_[3], v_[3], v_x[3], vx;
 
@@ -287,14 +298,12 @@ double get_timestep_simple(double x0[3], double v0[3], double x[3], double v[3])
         v_x[i] = v_[i] + vx * x_[i];
     }
 
-    _exit_function();
 
     return sqrt( scal_prod(x_, x_) / scal_prod(v_x, v_x) );
 }
 
 void re_init(struct particle *parts, int pcount)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_RE_INIT);
     struct particle *p;
     int i;
 
@@ -323,7 +332,6 @@ void re_init(struct particle *parts, int pcount)
         p->io_steps_p = 0;
     }
 
-    _exit_function();
 }
 
 
@@ -338,7 +346,6 @@ void integrate( struct particle parts[], int pcount,
                 int method, int print, double orbits, double t_steps,
                 FILE *dumpfile, int print_dump_only)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_INTEGRATE);
     double t_max, pt;
     double e_, a_, t_, j_, _help[4];
     double rv_=0.0, rv=0.0, del_t = 0.0;
@@ -382,7 +389,7 @@ void integrate( struct particle parts[], int pcount,
 
         //PARTICLES
         fscanf(dumpfile, "%*s%*c");
-        assert(pcount == (int)fread(parts, sizeof(struct particle), pcount, dumpfile));
+        assert(pcount == fread(parts, sizeof(struct particle), pcount, dumpfile));
 
         for(p = parts; p < parts + pcount; p++)
             if(p > parts && p->m > _m_max
@@ -392,6 +399,12 @@ void integrate( struct particle parts[], int pcount,
                 )
                  _m_max = p->m;
 
+        #ifdef USE_SSE
+        for(p = parts; p < parts + pcount; p++)
+            if(N_MAX_DETAIL >= -1 && p->name > N_MAX_DETAIL)
+                p->sse_on = 0;
+        #endif
+
         if(print_dump_only)
         {
             for(p = parts; p < parts + pcount; p++)
@@ -400,7 +413,7 @@ void integrate( struct particle parts[], int pcount,
                         convert_length(p->x[0], 0), convert_length(p->x[1], 0), convert_length(p->x[2], 0),
                         convert_length(convert_time(p->v[0], 1), 0), convert_length(convert_time(p->v[1], 1), 0), convert_length(convert_time(p->v[2], 1), 0),
                         convert_length(v_abs(p->x), 0), convert_length(p->curr_a, 0), 1 - p->curr_e, convert_length(p->rmin, 0), convert_length(p->rmax, 0),
-                        convert_length(p->r_apo, 0), convert_length(p->r_peri, 0), p->energy, p->energy + p->m * (.5 * p->phi_stars), 1
+                        convert_length(p->r_apo, 0), convert_length(p->r_peri, 0), p->energy, p->energy + p->m * (.5 * p->phi_stars), p->sse_multiple
                         );
             return;
         }
@@ -447,7 +460,7 @@ void integrate( struct particle parts[], int pcount,
     // iterate
     for(;; add_over(1, &count_blocks, &count_blocks_over))
     {
-        // Dump status at the beggining and at the end
+        // dump status
         if(ul_kill > 0 || (printed &&
             ((time(NULL) - lastdump > DUMP_INTERVAL)
             || (parts[1].t + t_over >= t_max && !force_print))))
@@ -541,6 +554,10 @@ void integrate( struct particle parts[], int pcount,
                         p->t -= t_maxval;
                         p->io_tlast -= t_maxval;
                         p->htlast -= t_maxval;
+                        #ifdef USE_GRAPE
+                        if((method == 'i') && (p > parts))
+                            grape_send_particle(p, p - parts);
+                        #endif
                     }
                     t_over += t_maxval;
                     fprintf(get_file(FILE_WARNING),"### [%1.12e] reset time by %e (%e system units) ###\n",
@@ -578,14 +595,16 @@ void integrate( struct particle parts[], int pcount,
             _help[0], _help[1]);
 
     output_stepsize();
-    _exit_function();
+    #ifdef USE_GRAPE
+    if(method == 'i')
+        g6_close(C_GRAPE_CLUSID);
+    #endif
 }
 
 
 
 void sigproc(int signal)
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_SIGPROC);
     switch(signal)
     {
         //case SIGSEGV:
@@ -611,9 +630,13 @@ void sigproc(int signal)
                 #endif
         fflush(get_file(FILE_WARNING));
 
+        #ifdef USE_GRAPE
+        ul_kill = SIGNAL_FREE_GRAPE;
+        #else
         fprintf(get_file(FILE_WARNING), "#### Falling asleep... ####\n"); fflush(get_file(FILE_WARNING));
         raise(SIGSTOP);
         fprintf(get_file(FILE_WARNING), "#### ...woken up again. ####\n"); fflush(get_file(FILE_WARNING));
+        #endif
 
         break;
 
@@ -629,7 +652,6 @@ void sigproc(int signal)
         ul_kill = signal;
     }
 
-    _exit_function();
 }
 
 int main(int argc, char **argv)
@@ -653,22 +675,19 @@ int main(int argc, char **argv)
       */
 
 {
-    _enter_function(_UL_NBODY, _UL_NBODY_MAIN);
     double t_steps=0.0;
     struct particle *parts[1];
-    char mode='s';
-    char *infile_name=(char*)"";
-    char *outfile_name=(char*)malloc(300), method='u', *c;
+    char mode='s', *infile_name="", *outfile_name=(char*)malloc(300), method='u', *c;
     double orbits=10;
     int pcount=0, i;
     FILE *infile=NULL;
     double t_=t_maxval+DT_TOLERANCE*.5;
 
-    //signal(SIGINT, sigproc);
-    //signal(SIGQUIT, sigproc);
-    //signal(SIGTERM, sigproc);
-    //signal(SIGUSR1, sigproc);
-    //signal(SIGUSR2, sigproc);
+    signal(SIGINT, sigproc);
+    signal(SIGQUIT, sigproc);
+    signal(SIGTERM, sigproc);
+    signal(SIGUSR1, sigproc);
+    signal(SIGUSR2, sigproc);
     //signal(SIGSEGV, sigproc);
 
     while(t_ > t_maxval)
@@ -678,6 +697,10 @@ int main(int argc, char **argv)
     }
     t_maxval *= .5;
 
+    #ifdef USE_GRAPE
+    t_ = convert_time(2.*C_GRAPE_MAX_T_2, 1);
+    while(t_ < t_maxval) t_maxval *= .5;
+    #endif
 
     if(argc > 1) method = argv[1][0];
     switch(method)
@@ -746,12 +769,29 @@ int main(int argc, char **argv)
         fprintf(get_file(FILE_OUTPUT), "# ETA=%e\tMIN_EVALS=%d\n",ETA, MIN_EVALS);
         fprintf(get_file(FILE_OUTPUT), "# DT_TOLERANCE=%e\tT_MAX=%e\tP_IMBH=%d\tGRAPE=%d\tSSE=%d\tEXT_POT=%d\n",
                 DT_TOLERANCE, t_maxval, P_IMBH
+                #ifdef USE_GRAPE
+                , 1
+                #else
                 , 0
+                #endif
+                #ifdef USE_SSE
+                , 1
+                #else
                 , 0
+                #endif
+                #ifdef EXT_POT
+                , 1
+                #else
                 , 0
+                #endif
         );
 
+        #ifdef EXT_POT
+        fprintf(get_file(FILE_OUTPUT), "# EXTERNAL POTENTIAL: RHO0=%e\tGAMMA1=%e\tGAMMA2=%e\tRMIN=%e\tR0=%e\tRMAX=%e\n",
+                EP_RHO0, EP_GAMMA1, EP_GAMMA2, EP_RMIN, EP_R0, EP_RMAX);
+        #else
         fprintf(get_file(FILE_OUTPUT), "# NO EXTERNAL POTENTIAL\n");
+        #endif
         #ifdef N_MAX_DETAIL
         fprintf(get_file(FILE_OUTPUT), "# N_MAX_DETAIL=%d\n", N_MAX_DETAIL);
         #endif
@@ -788,7 +828,6 @@ int main(int argc, char **argv)
         fprintf(get_file(FILE_DEBUG), "### eval time: %8.2fs\n", t_eval);
         close_files();
 
-        _exit_function();
 
     return 0;
 }

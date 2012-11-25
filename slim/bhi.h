@@ -87,37 +87,7 @@ enum _module {_UL_NBODY=0, _UL_HERMITE2, _UL_IO, _UL_TIMESTEP, _UL_KEPLER};
 
 #define SIGNAL_PRINT_POS  -10
 
-extern int _global_module, _global_function;
 
-#define TRACK_FUNCTIONS
-
-#ifdef TRACK_FUNCTIONS
-
-#define _enter_function(module, function)   \
-  int __my_lastmodule   = _global_module;   \
-  int __my_lastfunction = _global_function; \
-  _global_module        = module;           \
-  _global_function      = function;
-
-#define _exit_function()		\
-  _global_module   = __my_lastmodule;   \
-  _global_function = __my_lastfunction;
-
-#define _print_position(v_kill, v_text, v_1, v_2, v_3, v_f)                     \
-  if(v_kill <= SIGNAL_PRINT_POS) {                                              \
-    fprintf(get_file(FILE_WARNING), "### WORKING AT %s ### %d\t%d\t%d\t%e\t\n", \
-    v_text, v_1, v_2, v_3, v_f);                                                \
-    fflush(get_file(FILE_WARNING));                                             \
-    v_kill -= SIGNAL_PRINT_POS;}
-
-
-#else  // NOT TRACK_FUNCTIONS
-
-#define _enter_function(module, function)
-#define _exit_function()
-#define _print_position()
-
-#endif // TRACK_FUNCTIONS
 
 struct particle {
   double x[3], xc[3], xp[3], xpc[3], dx[3], v[3], vc[3], vp[3], vpc[3], dv[3];
@@ -140,7 +110,6 @@ struct particle {
   int nearestneighbour, name;
 
   // GR
-  int use_pn;
   double gr_a[3], gr_a_[3];
 
   double gr_a_2[3], gr_a_3[3], v_thresh_2;
